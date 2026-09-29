@@ -127,6 +127,25 @@ try:
                 opp_ga_map[team] = round(data[0].get("goalsAgainstPerGame", 0), 2)
             else:
                 opp_ga_map[team] = 0
+
+                   # Goalie matchup data
+    goalie_map = {}
+
+    for team in slate_teams:
+        goalie_stats = get_goalie_stats(team)
+        goalie_data = goalie_stats.get("data", [])
+
+        if goalie_data:
+            goalie_row = goalie_data[0]
+            goalie_map[team] = {
+                "SV%": goalie_row.get("savePct", 0),
+                "GAA": goalie_row.get("goalsAgainstAverage", 0)
+            }
+        else:
+            goalie_map[team] = {
+                "SV%": 0,
+                "GAA": 0
+            } 
             
             
             skaters = []
