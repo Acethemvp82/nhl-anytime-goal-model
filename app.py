@@ -241,8 +241,8 @@ try:
             use_container_width=True,
             hide_index=True
         )
-else:
-    st.warning("No NHL games found.")
+    else:
+        st.warning("No NHL games found.")
 
 except Exception as e:
     st.error(f"Could not load NHL schedule: {e}")
