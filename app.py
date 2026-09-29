@@ -18,7 +18,12 @@ def get_nhl_schedule():
     response = requests.get(url, timeout=15)
     response.raise_for_status()
     return response.json()
-
+@st.cache_data(ttl=1800)
+def get_team_roster(team):
+    url = f"https://api-web.nhle.com/v1/roster/{team}/current"
+    response = requests.get(url, timeout=15)
+    response.raise_for_status()
+    return response.json()
 
 try:
     schedule_data = get_nhl_schedule()
