@@ -65,8 +65,8 @@ try:
             use_container_width=True,
             hide_index=True
         )
-            slate_teams = sorted(
-                set(daily_schedule["Away"].tolist() + daily_schedule["Home"].tolist())
+        slate_teams = sorted(
+            set(daily_schedule["Away"].tolist() + daily_schedule["Home"].tolist())
         )
 
         skaters = []
