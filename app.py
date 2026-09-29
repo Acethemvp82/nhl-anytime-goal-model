@@ -87,15 +87,15 @@ try:
                     player_id = player.get("id")
                     player_stats = get_player_stats(player_id)
 
-                   featured = player_stats.get("featuredStats", {})
-                   season_stats = featured.get("regularSeason", {}).get("subSeason", {})
+                    featured = player_stats.get("featuredStats", {})
+                    season_stats = featured.get("regularSeason", {}).get("subSeason", {})
 
-                   games_played = season_stats.get("gamesPlayed", 0)
-                   goals = season_stats.get("goals", 0)
-                   shots = season_stats.get("shots", 0)
+                    games_played = season_stats.get("gamesPlayed", 0)
+                    goals = season_stats.get("goals", 0)
+                    shots = season_stats.get("shots", 0)
 
-                  goals_per_game = round(goals / games_played, 3) if games_played else 0
-                  shots_per_game = round(shots / games_played, 2) if games_played else 0
+                    goals_per_game = round(goals / games_played, 3) if games_played else 0
+                    shots_per_game = round(shots / games_played, 2) if games_played else 0
                     
                  skaters.append({
                      "Player": f"{first_name} {last_name}".strip(),
