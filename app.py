@@ -26,18 +26,18 @@ try:
     games = []
 
             for week in schedule_data.get("gameWeek", []):
-            game_date = week.get("date", "")
+                game_date = week.get("date", "")
 
-            for game in week.get("games", []):
-                away = game.get("awayTeam", {}).get("abbrev", "TBD")
-                home = game.get("homeTeam", {}).get("abbrev", "TBD")
+                for game in week.get("games", []):
+                    away = game.get("awayTeam", {}).get("abbrev", "TBD")
+                    home = game.get("homeTeam", {}).get("abbrev", "TBD")
 
-                games.append({
-                    "Date": game_date,
-                    "Away": away,
-                    "Home": home,
-                    "Status": game.get("gameState", "")
-                })
+                    games.append({
+                        "Date": game_date,
+                        "Away": away,
+                        "Home": home,
+                        "Status": game.get("gameState", "")
+                    })
 
     if games:
         schedule_df = pd.DataFrame(games)
