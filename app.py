@@ -209,6 +209,11 @@ try:
                         goalie_match = round(sv_weakness + gaa_weakness, 1)
                     else:
                         goalie_match = 0
+                    final_anytime = round(
+                        (goal_match * 0.75) +
+                        (goalie_match * 0.25),
+                        1
+                    )
                     
                     skaters.append({
                         "Player": f"{first_name} {last_name}".strip(),
@@ -218,6 +223,7 @@ try:
                         "Goal Threat": goal_threat,
                         "Goal Match": goal_match,
                         "Goalie Match": goalie_match,
+                        "Final Anytime": final_anytime,
                         "Position": position,
                         "GP": games_played,
                         "Goals": goals,
