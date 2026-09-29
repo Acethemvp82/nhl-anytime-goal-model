@@ -96,7 +96,10 @@ try:
 
                     goals_per_game = round(goals / games_played, 3) if games_played else 0
                     shots_per_game = round(shots / games_played, 2) if games_played else 0
-                    
+                    goal_rate_score = min(goals_per_game / 0.60, 1.0) * 50
+                    shot_rate_score = min(shots_per_game / 4.0, 1.0) * 50
+
+                    goal_threat = round(goal_rate_score + shot_rate_score, 1)
                     skaters.append({
                         "Player": f"{first_name} {last_name}".strip(),
                          "Team": team,
@@ -106,8 +109,9 @@ try:
                          "G/GP": goals_per_game,
                          "Shots": shots,
                          "S/GP": shots_per_game,
-                        "Player_ID": player_id
-                    })
+                         "Goal Threat": goal_threat,
+                         "Player_ID": player_id
+                     })
 
         if skaters:
             skaters_df = pd.DataFrame(skaters)
