@@ -156,14 +156,22 @@ try:
                     shot_rate_score = min(shots_per_game / 4.0, 1.0) * 50
 
                     goal_threat = round(goal_rate_score + shot_rate_score, 1)
+                    matchup_score = min(opp_ga_per_game / 4.0, 1.0) * 100
 
+                    goal_match = round(
+                        (goal_threat * 0.70) +
+                        (matchup_score * 0.30),
+                        1
+                    )
                     skaters.append({
                         "Player": f"{first_name} {last_name}".strip(),
                         "Team": team,
                         "Opponent": opponent_map.get(team, "TBD"),
                         "Opp GA/GP": opp_ga_map.get(opponent_map.get(team, ""), 0),
                         "Goal Threat": goal_threat,
+                        "Goal Match": goal_match,
                         "Position": position,
+                        
                         "GP": games_played,
                         "Goals": goals,
                         "G/GP": goals_per_game,
