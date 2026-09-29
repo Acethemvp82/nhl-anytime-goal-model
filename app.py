@@ -140,22 +140,24 @@ try:
 
                     opponent_data = opponent_stats.get("data", [])
 
-            if opponent_data:
-                opponent_row = opponent_data[0]
-                opp_goals_against = opponent_row.get("goalsAgainst", 0)
-                opp_games_played = opponent_row.get("gamesPlayed", 0)
+                    if opponent_data:
+                        opponent_row = opponent_data[0]
+                        opp_goals_against = opponent_row.get("goalsAgainst", 0)
+                        opp_games_played = opponent_row.get("gamesPlayed", 0)
 
-                opp_ga_per_game = (
-                    round(opp_goals_against / opp_games_played, 2)
-                    if opp_games_played else 0
-                )
-            else:
-                opp_ga_per_game = 0
-            goal_rate_score = min(goals_per_game / 0.60, 1.0) * 50
-            shot_rate_score = min(shots_per_game / 4.0, 1.0) * 50
+                        opp_ga_per_game = (
+                            round(opp_goals_against / opp_games_played, 2)
+                            if opp_games_played else 0
+                        )
+                    else:
+                        opp_ga_per_game = 0
 
-            goal_threat = round(goal_rate_score + shot_rate_score, 1)
-            skaters.append({
+                    goal_rate_score = min(goals_per_game / 0.60, 1.0) * 50
+                    shot_rate_score = min(shots_per_game / 4.0, 1.0) * 50
+
+                    goal_threat = round(goal_rate_score + shot_rate_score, 1)
+
+                    skaters.append({
                         "Player": f"{first_name} {last_name}".strip(),
                         "Team": team,
                         "Opponent": opponent_map.get(team, "TBD"),
@@ -169,7 +171,7 @@ try:
                         "S/GP": shots_per_game,
                         "Player_ID": player_id
                     })
-                        
+           
                         
                         
                     
