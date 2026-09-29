@@ -36,9 +36,8 @@ def get_team_stats(team):
     response = requests.get(url, timeout=15)
     response.raise_for_status()
     return response.json()
-# DEBUG TEAM STATS
-team_test = get_team_stats("BOS")
-st.write("TEAM STATS DEBUG:", team_test)
+
+
 try:
     schedule_data = get_nhl_schedule()
 
