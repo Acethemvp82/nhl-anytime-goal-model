@@ -201,8 +201,8 @@ try:
                     opponent = opponent_map.get(team, "TBD")
                     opp_goalie = goalie_map.get(opponent, {"SV%": 0, "GAA": 0})
 
-                    goalie_sv = opp_goalie.get("SV%", 0)
-                    goalie_gaa = opp_goalie.get("GAA", 0)
+                    goalie_sv = opp_goalie.get("SV%") or 0
+                    goalie_gaa = opp_goalie.get("GAA") or 0
                     if goalie_sv > 0 and goalie_gaa > 0:
                         sv_weakness = max(0, min((0.920 - goalie_sv) / 0.050, 1.0)) * 50
                         gaa_weakness = max(0, min(goalie_gaa / 4.0, 1.0)) * 50
