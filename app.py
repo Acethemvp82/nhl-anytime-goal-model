@@ -65,6 +65,36 @@ try:
             use_container_width=True,
             hide_index=True
         )
+            slate_teams = sorted(
+                set(daily_schedule["Away"].tolist() + daily_schedule["Home"].tolist())
+        )
+
+        skaters = []
+
+        for team in slate_teams:
+            roster = get_team_roster(team)
+
+            for position_group in ["forwards", "defensemen"]:
+                for player in roster.get(position_group, []):
+                    first_name = player.get("firstName", {}).get("default", "")
+                    last_name = player.get("lastName", {}).get("default", "")
+                    position = player.get("positionCode", "")
+
+                    skaters.append({
+                        "Player": f"{first_name} {last_name}".strip(),
+                        "Team": team,
+                        "Position": position
+                    })
+
+        if skaters:
+            skaters_df = pd.DataFrame(skaters)
+
+            st.subheader("🏒 Today's Skaters")
+            st.dataframe(
+                skaters_df,
+                use_container_width=True,
+                hide_index=True
+            )
     else:
         st.warning("No NHL games found.")
 
