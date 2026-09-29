@@ -97,17 +97,17 @@ try:
                     goals_per_game = round(goals / games_played, 3) if games_played else 0
                     shots_per_game = round(shots / games_played, 2) if games_played else 0
                     
-                 skaters.append({
-                     "Player": f"{first_name} {last_name}".strip(),
-                     "Team": team,
-                     "Position": position,
-                     "GP": games_played,
-                     "Goals": goals,
-                     "G/GP": goals_per_game,
-                     "Shots": shots,
-                     "S/GP": shots_per_game,
-                    "Player_ID": player_id
-                })
+                    skaters.append({
+                        "Player": f"{first_name} {last_name}".strip(),
+                         "Team": team,
+                         "Position": position,
+                         "GP": games_played,
+                         "Goals": goals,
+                         "G/GP": goals_per_game,
+                         "Shots": shots,
+                         "S/GP": shots_per_game,
+                        "Player_ID": player_id
+                    })
 
         if skaters:
             skaters_df = pd.DataFrame(skaters)
