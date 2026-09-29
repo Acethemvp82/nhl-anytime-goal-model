@@ -85,13 +85,29 @@ try:
                     last_name = player.get("lastName", {}).get("default", "")
                     position = player.get("positionCode", "")
                     player_id = player.get("id")
+                    player_stats = get_player_stats(player_id)
+
+                   featured = player_stats.get("featuredStats", {})
+                   season_stats = featured.get("regularSeason", {}).get("subSeason", {})
+
+                   games_played = season_stats.get("gamesPlayed", 0)
+                   goals = season_stats.get("goals", 0)
+                   shots = season_stats.get("shots", 0)
+
+                  goals_per_game = round(goals / games_played, 3) if games_played else 0
+                  shots_per_game = round(shots / games_played, 2) if games_played else 0
                     
-                    skaters.append({
-                        "Player": f"{first_name} {last_name}".strip(),
-                        "Team": team,
-                        "Position": position,
-                        "Player_ID": player_id
-                    })
+                 skaters.append({
+                     "Player": f"{first_name} {last_name}".strip(),
+                     "Team": team,
+                     "Position": position,
+                     "GP": games_played,
+                     "Goals": goals,
+                     "G/GP": goals_per_game,
+                     "Shots": shots,
+                     "S/GP": shots_per_game,
+                    "Player_ID": player_id
+                })
 
         if skaters:
             skaters_df = pd.DataFrame(skaters)
