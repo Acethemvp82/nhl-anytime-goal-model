@@ -115,6 +115,16 @@ try:
 
         if skaters:
             skaters_df = pd.DataFrame(skaters)
+            skaters_df = skaters_df.sort_values(
+               by="Goal Threat",
+               ascending=False
+            ).reset_index(drop=True)
+
+            skaters_df.insert(
+                0,
+                "Rank",
+                range(1, len(skaters_df) + 1)
+            )
 
             st.subheader("🏒 Today's Skaters")
             st.dataframe(
