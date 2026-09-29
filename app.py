@@ -26,12 +26,14 @@ try:
     games = []
 
     for week in schedule_data.get("gameWeek", []):
-        for game in week.get("games", []):
-            away = game.get("awayTeam", {}).get("abbrev", "TBD")
-            home = game.get("homeTeam", {}).get("abbrev", "TBD")
+    game_date = week.get("date", "")
+
+    for game in week.get("games", []):
+        away = game.get("awayTeam", {}).get("abbrev", "TBD")
+        home = game.get("homeTeam", {}).get("abbrev", "TBD")
 
             games.append({
-                "Date": game.get("gameDate", ""),
+                "Date": game_date,
                 "Away": away,
                 "Home": home,
                 "Status": game.get("gameState", "")
