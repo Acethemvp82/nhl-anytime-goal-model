@@ -52,11 +52,12 @@ try:
 
             games.append({
                 "Date": game_date,
-            
                 "Away": away,
                 "Home": home,
                 "Status": game.get("gameState", "")
             })
+            
+                
 
     if games:
         schedule_df = pd.DataFrame(games)
@@ -100,7 +101,7 @@ try:
                 opp_ga_map[team] = round(data[0].get("goalsAgainstPerGame", 0), 2)
             else:
                 opp_ga_map[team] = 0
-            st.write("OPP GA MAP:", opp_ga_map)
+            
             
             skaters = []
 
@@ -146,19 +147,20 @@ try:
                     goal_threat = round(goal_rate_score + shot_rate_score, 1)
                     skaters.append({
                         "Player": f"{first_name} {last_name}".strip(),
-                         "Team": team,
-                         "Opponent": opponent_map.get(team, "TBD"),
-                         "Opp GA/GP": opp_ga_map.get(opponent_map.get(team, ""), 0),
-                         "Opp GA/GP": opp_ga_per_game,
-                         "Position": position,
-                         "GP": games_played,
-                         "Goals": goals,
-                         "G/GP": goals_per_game,
-                         "Shots": shots,
-                         "S/GP": shots_per_game,
-                         "Goal Threat": goal_threat,
-                         "Player_ID": player_id
-                     })
+                        "Team": team,
+                        "Opponent": opponent_map.get(team, "TBD"),
+                        "Opp GA/GP": opp_ga_map.get(opponent_map.get(team, ""), 0),
+                        "Position": position,
+                        "GP": games_played,
+                        "Goals": goals,
+                        "G/GP": goals_per_game,
+                        "Shots": shots,
+                        "S/GP": shots_per_game,
+                        "Goal Threat": goal_threat,
+                        "Player_ID": player_id
+                    })
+                         
+                         
 
         if skaters:
             skaters_df = pd.DataFrame(skaters)
