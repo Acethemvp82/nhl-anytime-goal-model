@@ -46,7 +46,23 @@ def get_team_stats(team):
     response = requests.get(url, timeout=15)
     response.raise_for_status()
     return response.json()
+@st.cache_data(ttl=1800)
+def get_team_stats(team):
+    url = f"https://api.nhle.com/stats/rest/en/team/summary?cayenneExp=teamAbbrev=\"{team}\""
+    response = requests.get(url, timeout=15)
+    response.raise_for_status()
+    return response.json()
 
+@st.cache_data(ttl=1800)
+def get_goalie_stats(team):
+    url = (
+        "https://api.nhle.com/stats/rest/en/goalie/summary"
+        f"?cayenneExp=teamAbbrevs=\"{team}\""
+    )
+
+    response = requests.get(url, timeout=15)
+    response.raise_for_status()
+    return response.json()
 
 try:
     schedule_data = get_nhl_schedule()
