@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import requests
+import time
 st.set_page_config(
     page_title="NHL Anytime Goal Model",
     page_icon="🏒",
@@ -27,9 +28,18 @@ def get_team_roster(team):
 @st.cache_data(ttl=1800)
 def get_player_stats(player_id):
     url = f"https://api-web.nhle.com/v1/player/{player_id}/landing"
-    response = requests.get(url, timeout=15)
-    response.raise_for_status()
-    return response.json()
+
+    for attempt in range(3):
+        response = requests.get(url, timeout=15)
+
+        if response.status_code == 429:
+            time.sleep(2 * (attempt + 1))
+            continue
+
+        response.raise_for_status()
+        return response.json()
+
+    return {}
 @st.cache_data(ttl=1800)
 def get_team_stats(team):
     url = f"https://api.nhle.com/stats/rest/en/team/summary?cayenneExp=teamAbbrev=%22{team}%22"
