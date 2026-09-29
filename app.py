@@ -35,7 +35,7 @@ def get_team_roster(team):
 
     return {}
 
- @st.cache_data(ttl=1800)
+@st.cache_data(ttl=1800)
 def get_player_stats(player_id):
     url = f"https://api-web.nhle.com/v1/player/{player_id}/landing"
 
