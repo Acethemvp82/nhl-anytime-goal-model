@@ -35,7 +35,21 @@ def get_team_roster(team):
 
     return {}
 
-      
+ @st.cache_data(ttl=1800)
+def get_player_stats(player_id):
+    url = f"https://api-web.nhle.com/v1/player/{player_id}/landing"
+
+    for attempt in range(3):
+        response = requests.get(url, timeout=15)
+
+        if response.status_code == 429:
+            time.sleep(2 * (attempt + 1))
+            continue
+
+        response.raise_for_status()
+        return response.json()
+
+    return {}     
 
     
 
