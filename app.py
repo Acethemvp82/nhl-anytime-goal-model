@@ -164,9 +164,15 @@ try:
                     featured = player_stats.get("featuredStats", {})
                     season_stats = featured.get("regularSeason", {}).get("subSeason", {})
 
-                    games_played = season_stats.get("gamesPlayed", 0)
-                    goals = season_stats.get("goals", 0)
-                    shots = season_stats.get("shots", 0)
+                    games_played = season_stats.get("gamesPlayed") or 0
+                    goals = season_stats.get("goals") or 0
+                    shots = season_stats.get("shots") or 0
+
+                    if games_played == 0:
+                        career_stats = featured.get("regularSeason", {}).get("career", {})
+                        games_played = career_stats.get("gamesPlayed") or 0
+                        goals = career_stats.get("goals") or 0
+                        shots = career_stats.get("shots") or 0
 
                     goals_per_game = round(goals / games_played, 3) if games_played else 0
                     shots_per_game = round(shots / games_played, 2) if games_played else 0
