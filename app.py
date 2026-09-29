@@ -184,13 +184,13 @@ try:
                 by=["Team", "Goal Threat"],
                 ascending=[True, False]
             ).reset_index(drop=True)
-        if "Rank" in skaters_df.columns:
-            skaters_df = skaters_df.drop(columns=["Rank"])
-        skaters_df.insert(
-            0,
-            "Team Rank",
-            skaters_df.groupby("Team").cumcount() + 1
-        )
+            if "Rank" in skaters_df.columns:
+                skaters_df = skaters_df.drop(columns=["Rank"])
+            skaters_df.insert(
+                0,
+                "Team Rank",
+                skaters_df.groupby("Team").cumcount() + 1
+            )
 
             st.subheader("🏒 Today's Skaters")
             st.dataframe(
