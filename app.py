@@ -148,7 +148,7 @@ try:
             } 
             
             
-            skaters = []
+        skaters = []
 
         for team in slate_teams:
             roster = get_team_roster(team)
