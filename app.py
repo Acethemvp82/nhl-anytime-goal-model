@@ -107,6 +107,7 @@ try:
 
         for team in slate_teams:
             roster = get_team_roster(team)
+            st.write(team, roster.keys())
 
             for position_group in ["forwards", "defensemen"]:
                 for player in roster.get(position_group, []):
