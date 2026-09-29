@@ -85,13 +85,13 @@ try:
                     last_name = player.get("lastName", {}).get("default", "")
                     position = player.get("positionCode", "")
                     player_id = player.get("id")
+                    
                     skaters.append({
-                       skaters.append({
-                            "Player": f"{first_name} {last_name}".strip(),
-                            "Team": team,
-                            "Position": position,
-                            "Player_ID": player_id
-                      })
+                        "Player": f"{first_name} {last_name}".strip(),
+                        "Team": team,
+                        "Position": position,
+                        "Player_ID": player_id
+                    })
 
         if skaters:
             skaters_df = pd.DataFrame(skaters)
