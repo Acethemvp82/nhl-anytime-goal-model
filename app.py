@@ -100,7 +100,9 @@ try:
                 opp_ga_map[team] = round(data[0].get("goalsAgainstPerGame", 0), 2)
             else:
                 opp_ga_map[team] = 0
-        skaters = []
+            st.write("OPP GA MAP:", opp_ga_map)
+            
+            skaters = []
 
         for team in slate_teams:
             roster = get_team_roster(team)
