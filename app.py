@@ -92,14 +92,14 @@ try:
             # Opponent goals-against per game
         opp_ga_map = {}
 
-       for team in slate_teams:
-           team_stats = get_team_stats(team)
-           data = team_stats.get("data", [])
+        for team in slate_teams:
+            team_stats = get_team_stats(team)
+            data = team_stats.get("data", [])
 
-           if data:
-               opp_ga_map[team] = round(data[0].get("goalsAgainstPerGame", 0), 2)
-           else:
-               opp_ga_map[team] = 0
+            if data:
+                opp_ga_map[team] = round(data[0].get("goalsAgainstPerGame", 0), 2)
+            else:
+                opp_ga_map[team] = 0
         skaters = []
 
         for team in slate_teams:
