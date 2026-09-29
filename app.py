@@ -198,6 +198,18 @@ try:
                         (matchup_score * 0.30),
                         1
                     )
+                    opponent = opponent_map.get(team, "TBD")
+                    opp_goalie = goalie_map.get(opponent, {"SV%": 0, "GAA": 0})
+
+                    goalie_sv = opp_goalie.get("SV%", 0)
+                    goalie_gaa = opp_goalie.get("GAA", 0)
+                    if goalie_sv > 0 and goalie_gaa > 0:
+                        sv_weakness = max(0, min((0.920 - goalie_sv) / 0.050, 1.0)) * 50
+                        gaa_weakness = max(0, min(goalie_gaa / 4.0, 1.0)) * 50
+                        goalie_match = round(sv_weakness + gaa_weakness, 1)
+                    else:
+                        goalie_match = 0
+                    
                     skaters.append({
                         "Player": f"{first_name} {last_name}".strip(),
                         "Team": team,
@@ -205,8 +217,8 @@ try:
                         "Opp GA/GP": opp_ga_map.get(opponent_map.get(team, ""), 0),
                         "Goal Threat": goal_threat,
                         "Goal Match": goal_match,
+                        "Goalie Match": goalie_match,
                         "Position": position,
-                        
                         "GP": games_played,
                         "Goals": goals,
                         "G/GP": goals_per_game,
@@ -214,6 +226,7 @@ try:
                         "S/GP": shots_per_game,
                         "Player_ID": player_id
                     })
+                        
            
                         
                         
