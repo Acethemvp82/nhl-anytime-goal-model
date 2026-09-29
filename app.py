@@ -73,7 +73,14 @@ try:
         slate_teams = sorted(
             set(daily_schedule["Away"].tolist() + daily_schedule["Home"].tolist())
         )
+            opponent_map = {}
 
+            for _, game in daily_schedule.iterrows():
+                away_team = game["Away"]
+                home_team = game["Home"]
+
+                opponent_map[away_team] = home_team
+                opponent_map[home_team] = away_team
         skaters = []
 
         for team in slate_teams:
@@ -103,6 +110,7 @@ try:
                     skaters.append({
                         "Player": f"{first_name} {last_name}".strip(),
                          "Team": team,
+                         "Opponent": opponent_map.get(team, "TBD"),
                          "Position": position,
                          "GP": games_played,
                          "Goals": goals,
