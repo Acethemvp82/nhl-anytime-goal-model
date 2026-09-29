@@ -112,7 +112,6 @@ try:
             "Forwards:", len(roster.get("forwards", [])),
             "Defensemen:", len(roster.get("defensemen", []))
         )
-
             for position_group in ["forwards", "defensemen"]:
                 for player in roster.get(position_group, []):
                     first_name = player.get("firstName", {}).get("default", "")
