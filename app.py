@@ -41,9 +41,25 @@ try:
             })
 
     if games:
-        schedule_df = pd.DataFrame(games)
-        st.subheader("🏒 NHL Schedule")
-        st.dataframe(schedule_df, use_container_width=True, hide_index=True)
+    schedule_df = pd.DataFrame(games)
+
+    available_dates = sorted(schedule_df["Date"].unique())
+
+    selected_date = st.selectbox(
+        "📅 Select Game Date",
+        available_dates
+    )
+
+    daily_schedule = schedule_df[
+        schedule_df["Date"] == selected_date
+    ].copy()
+
+    st.subheader(f"🏒 NHL Schedule — {selected_date}")
+    st.dataframe(
+        daily_schedule,
+        use_container_width=True,
+        hide_index=True
+    )
     else:
         st.warning("No NHL games found.")
 
