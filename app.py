@@ -146,6 +146,7 @@ try:
                         "Player": f"{first_name} {last_name}".strip(),
                          "Team": team,
                          "Opponent": opponent_map.get(team, "TBD"),
+                         "Opp GA/GP": opp_ga_map.get(opponent_map.get(team, ""), 0),
                          "Opp GA/GP": opp_ga_per_game,
                          "Position": position,
                          "GP": games_played,
