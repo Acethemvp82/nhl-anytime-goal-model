@@ -393,9 +393,14 @@ try:
             if col in skaters_df.columns:
                 skaters_df[col] = skaters_df[col].round(1)
         display_df = skaters_df.drop(columns=["Opponent"], errors="ignore")
+        cols = list(display_df.columns)
+        cols.remove("Bet Tier")
+        final_idx = cols.index("Final Anytime")
+        cols.insert(final_idx + 1, "Bet Tier")
+        display_df = display_df[cols]
         st.subheader("🏒 Today's Skaters")
         st.dataframe(
-      display_df.style
+        display_df.style
           .map(
               color_goal_threat,
               subset=["Goal Threat"]
