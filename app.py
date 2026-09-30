@@ -77,9 +77,11 @@ def get_team_stats(team):
 
 @st.cache_data(ttl=1800)
 def get_goalie_stats(team):
+    current_season = "20262027"
+
     url = (
         "https://api.nhle.com/stats/rest/en/goalie/summary"
-        f"?cayenneExp=teamAbbrevs=\"{team}\""
+        f"?cayenneExp=seasonId={current_season}%20and%20teamAbbrev=%22{team}%22"
     )
 
     response = requests.get(url, timeout=15)
