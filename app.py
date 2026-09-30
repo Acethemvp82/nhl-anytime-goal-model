@@ -307,14 +307,25 @@ try:
 
     if skaters:
         skaters_df = pd.DataFrame(skaters)
+
+        # Rank players by the model's strongest scoring signal
         skaters_df = skaters_df.sort_values(
-            by=["Team", "Goal Threat"],
-            ascending=[True, False]
+            by=["Final Anytime", "Goal Match", "Goal Threat"],
+            ascending=[False, False, False]
         ).reset_index(drop=True)
-        if "Rank" in skaters_df.columns:
-            skaters_df = skaters_df.drop(columns=["Rank"])
+
+        for col in ["Rank", "Overall Rank", "Team Rank"]:
+            if col in skaters_df.columns:
+            skaters_df = skaters_df.drop(columns=[col])
+
         skaters_df.insert(
             0,
+            "Overall Rank",
+            range(1, len(skaters_df) + 1)
+        )
+    
+        skaters_df.insert(
+            1,
             "Team Rank",
             skaters_df.groupby("Team").cumcount() + 1
         )
