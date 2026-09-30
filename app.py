@@ -329,6 +329,20 @@ try:
                 return "background-color: #ff9100; color: black; font-weight: bold"
             else:
                 return ""
+        def anytime_tier(val):
+            if val >= 70:
+                return "🔥 ELITE"
+            elif val >= 60:
+                return "🟢 STRONG"
+            elif val >= 50:
+                return "🟡 GOOD"
+            elif val >= 40:
+                return "🟠 LEAN"
+            else:
+                return "PASS"
+
+        skaters_df["Bet Tier"] = skaters_df["Final Anytime"].apply(anytime_tier)
+        
         st.subheader("🏒 Today's Skaters")
         st.dataframe(
             skaters_df.style.map(
