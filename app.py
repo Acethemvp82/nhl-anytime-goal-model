@@ -325,10 +325,10 @@ try:
                  return "background-color: #64dd17; color: black; font-weight: bold"
             elif val >= 50:
                 return "background-color: #ffd600; color: black; font-weight: bold"
-           elif val >= 40:
-               return "background-color: #ff9100; color: black; font-weight: bold"
-           else:
-               return ""
+            elif val >= 40:
+                return "background-color: #ff9100; color: black; font-weight: bold"
+            else:
+                return ""
         st.subheader("🏒 Today's Skaters")
         st.dataframe(
             skaters_df,
