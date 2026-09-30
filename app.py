@@ -86,6 +86,7 @@ def get_goalie_stats(team):
 
     response = requests.get(url, timeout=15)
     response.raise_for_status()
+    st.write("GOALIE API:", team, response.json())
     return response.json()
 
 try:
