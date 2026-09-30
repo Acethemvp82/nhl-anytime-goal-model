@@ -342,7 +342,9 @@ try:
                 return "PASS"
 
         skaters_df["Bet Tier"] = skaters_df["Final Anytime"].apply(anytime_tier)
-        
+        for col in ["Opp GA/GP", "Goal Threat", "Goal Match", "Goalie Match", "Final Anytime"]:
+            if col in skaters_df.columns:
+                skaters_df[col] = skaters_df[col].round(1)
         
         st.subheader("🏒 Today's Skaters")
         st.dataframe(
