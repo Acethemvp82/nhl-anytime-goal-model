@@ -173,16 +173,16 @@ try:
                 "GAA": 0
             } 
             
-         game_data_map = {}
+      game_data_map = {}
 
-         for team in slate_teams:
+    for team in slate_teams:
              game_id = game_id_map.get(team)
 
              if game_id:
                  game_data_map[team] = get_game_data(game_id)
              else:
                  game_data_map[team] = {}   
-        skaters = []
+      skaters = []
 
         for team in slate_teams:
             roster = get_team_roster(team)
