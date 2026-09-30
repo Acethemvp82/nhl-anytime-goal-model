@@ -182,7 +182,7 @@ try:
                  game_data_map[team] = get_game_data(game_id)
              else:
                  game_data_map[team] = {}   
-      skaters = []
+    skaters = []      
 
         for team in slate_teams:
             roster = get_team_roster(team)
