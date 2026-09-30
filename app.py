@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import requests
 import time
+from zoneinfo import ZoneInfo
 st.set_page_config(
     page_title="NHL Anytime Goal Model",
     page_icon="🏒",
@@ -100,12 +101,18 @@ try:
         for game in week.get("games", []):
             away = game.get("awayTeam", {}).get("abbrev", "TBD")
             home = game.get("homeTeam", {}).get("abbrev", "TBD")
-
+            start_time_utc = game.get("startTimeUTC", "")
+            if start_time_utc:
+                start_dt = pd.to_datetime(start_time_utc, utc=True).tz_convert(ZoneInfo("America/New_York"))
+                start_time = start_dt.strftime("%-I:%M %p")
+            else:
+                start_time = "TBD"
             games.append({
                 "Game_ID": game.get("id"),
                 "Date": game_date,
                 "Away": away,
                 "Home": home,
+                "Time": start_time,
                 "Status": game.get("gameState", "")
             })
             
