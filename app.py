@@ -184,7 +184,7 @@ try:
                  game_data_map[team] = {}   
     skaters = []      
 
-        for team in slate_teams:
+    for team in slate_teams:
             roster = get_team_roster(team)
             
             for position_group in ["forwards", "defensemen"]:
