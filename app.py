@@ -331,7 +331,10 @@ try:
                 return ""
         st.subheader("🏒 Today's Skaters")
         st.dataframe(
-            skaters_df,
+            skaters_df.style.map(
+                color_final_anytime,
+                subset=["Final Anytime"]
+            ),
             use_container_width=True,
             hide_index=True
         )
