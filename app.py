@@ -134,7 +134,7 @@ try:
 
         st.subheader(f"🏒 NHL Schedule — {selected_date}")
         st.dataframe(
-            daily_schedule,
+            daily_schedule.drop(columns=["Game_ID"]),
             use_container_width=True,
             hide_index=True
         )
