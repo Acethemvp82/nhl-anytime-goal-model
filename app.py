@@ -340,6 +340,31 @@ try:
                 return "background-color: #ff9100; color: black; font-weight: bold"
             else:
                 return ""
+        def color_goal_threat(val):
+            if val >= 70:
+                return "background-color: #00c853; color: white; font-weight: bold"
+            elif val >= 60:
+                return "background-color: #64dd17; color: black; font-weight: bold"
+            elif val >= 50:
+                return "background-color: #ffd600; color: black; font-weight: bold"
+            elif val >= 40:
+                return "background-color: #ff9100; color: black; font-weight: bold"
+            else:
+                return ""
+        
+        
+        def color_goal_match(val):
+            if val >= 70:
+                return "background-color: #00c853; color: white; font-weight: bold"
+            elif val >= 60:
+                return "background-color: #64dd17; color: black; font-weight: bold"
+            elif val >= 50:
+                return "background-color: #ffd600; color: black; font-weight: bold"
+            elif val >= 40:
+                return "background-color: #ff9100; color: black; font-weight: bold"
+            else:
+                return ""
+        
         def anytime_tier(val):
             if val >= 70:
                 return "🔥 ELITE"
@@ -359,16 +384,27 @@ try:
         
         st.subheader("🏒 Today's Skaters")
         st.dataframe(
-            skaters_df.style.map(
-                color_final_anytime,
-                subset=["Final Anytime"]
-            ).format({
-                "Opp GA/GP": "{:.2f}",
-                "Goal Threat": "{:.1f}",
-                "Goal Match": "{:.1f}",
-                "Goalie Match": "{:.1f}",
-               "Final Anytime": "{:.1f}",
-            }),
+      skaters_df.style
+          .map(
+              color_goal_threat,
+              subset=["Goal Threat"]
+         )
+         .map(
+             color_goal_match,
+             subset=["Goal Match"]
+         )
+         .map(
+             color_final_anytime,
+             subset=["Final Anytime"]
+         )
+         .format({
+             "Opp GA/GP": "{:.2f}",
+             "Goal Threat": "{:.1f}",
+             "Goal Match": "{:.1f}",
+             "Goalie Match": "{:.1f}",
+             "Final Anytime": "{:.1f}",
+         }),
+            
             use_container_width=True,
             hide_index=True
         )
