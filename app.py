@@ -351,7 +351,13 @@ try:
             skaters_df.style.map(
                 color_final_anytime,
                 subset=["Final Anytime"]
-            ),
+            ).format({
+                "Opp GA/GP": "{:.2f}",
+                "Goal Threat": "{:.1f}",
+                "Goal Match": "{:.1f}",
+                "Goalie Match": "{:.1f}",
+               "Final Anytime": "{:.1f}",
+            }),
             use_container_width=True,
             hide_index=True
         )
