@@ -248,23 +248,23 @@ try:
                     game_id = game_id_map.get(team)
                   # Identify opponent goalie from this game's data
                     opp_goalie_name = "Unknown"
-
-if game_data:
-    away_team = game_data.get("awayTeam", {}).get("abbrev", "")
-    home_team = game_data.get("homeTeam", {}).get("abbrev", "")
-
-    if team == away_team:
-        opponent_side = game_data.get("homeTeam", {})
-    else:
-        opponent_side = game_data.get("awayTeam", {})
-
-    # Use current-season goalie stats when available
-    if opponent in goalie_map:
-        opp_goalie = goalie_map[opponent]
-        opp_goalie_name = opp_goalie.get("Goalie", "Unknown")
+                    if game_data:
+                     away_team = game_data.get("awayTeam", {}).get("abbrev", "")
+                    home_team = game_data.get("homeTeam", {}).get("abbrev", "")
+                
+                    if team == away_team:
+                        opponent_side = game_data.get("homeTeam", {})
+                    else:
+                        opponent_side = game_data.get("awayTeam", {})
+                
+                    # Use current-season goalie stats when available
+                    if opponent in goalie_map:
+                        opp_goalie = goalie_map[opponent]
+                        opp_goalie_name = opp_goalie.get("Goalie", "Unknown")                                                           
                     
-if opponent not in goalie_map:
-    opp_goalie = {"SV%": 0, "GAA": 0}
+                                                                           
+                    if opponent not in goalie_map:
+                    opp_goalie = {"SV%": 0, "GAA": 0}
                     goalie_sv = opp_goalie.get("SV%") or 0
                     goalie_gaa = opp_goalie.get("GAA") or 0
                     if goalie_sv > 0 and goalie_gaa > 0:
