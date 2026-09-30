@@ -146,11 +146,13 @@ try:
         if goalie_data:
             goalie_row = goalie_data[0]
             goalie_map[team] = {
+               "Goalie": goalie_row.get("goalieFullName", "Unknown"), 
                 "SV%": goalie_row.get("savePct", 0),
                 "GAA": goalie_row.get("goalsAgainstAverage", 0)
             }
         else:
             goalie_map[team] = {
+                "Goalie": "Unknown",
                 "SV%": 0,
                 "GAA": 0
             } 
@@ -214,6 +216,7 @@ try:
                     )
                     opponent = opponent_map.get(team, "TBD")
                     opp_goalie = goalie_map.get(opponent, {"SV%": 0, "GAA": 0})
+                    opp_goalie_name = opp_goalie.get("Goalie", "Unknown")
 
                     goalie_sv = opp_goalie.get("SV%") or 0
                     goalie_gaa = opp_goalie.get("GAA") or 0
@@ -234,6 +237,7 @@ try:
                         "Team": team,
                         "Opponent": opponent_map.get(team, "TBD"),
                         "Opp GA/GP": opp_ga_map.get(opponent_map.get(team, ""), 0),
+                        "Opp Goalie": opp_goalie_name,
                         "Goal Threat": goal_threat,
                         "Goal Match": goal_match,
                         "Goalie Match": goalie_match,
