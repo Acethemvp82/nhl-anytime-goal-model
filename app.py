@@ -252,28 +252,10 @@ try:
                             opponent_side = game_data.get("homeTeam", {})
                         else:
                             opponent_side = game_data.get("awayTeam", {})
-                        # Identify opponent starting goalie from boxscore
-                        player_stats = game_data.get("playerByGameStats", {})
-                        
-                        if team == away_team:
-                            opponent_goalies = player_stats.get("homeTeam", {}).get("goalies", [])
-                        else:
-                            opponent_goalies = player_stats.get("awayTeam", {}).get("goalies", [])
-                        
-                        starting_goalie = next(
-                            (g for g in opponent_goalies if g.get("starter") is True),
-                            None
-                        )
-                        
-                        if starting_goalie:
-                            first = starting_goalie.get("name", {}).get("default", "")
-                            if not first:
-                                first = starting_goalie.get("firstName", {}).get("default", "")
-                                last = starting_goalie.get("lastName", {}).get("default", "")
-                                first = f"{first} {last}".strip()
-                        
-                            if first:
-                                opp_goalie_name = first
+                    # Use the opponent team's current goalie data
+                    if opponent in goalie_map:
+                    opp_goalie = goalie_map[opponent]
+                    opp_goalie_name = opp_goalie.get("Goalie", "Unknown")     
 
                     goalie_sv = opp_goalie.get("SV%") or 0
                     goalie_gaa = opp_goalie.get("GAA") or 0
