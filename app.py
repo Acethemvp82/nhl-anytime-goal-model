@@ -264,7 +264,7 @@ try:
                     
                                                                            
                     if opponent not in goalie_map:
-                    opp_goalie = {"SV%": 0, "GAA": 0}
+                       opp_goalie = {"SV%": 0, "GAA": 0}
                     goalie_sv = opp_goalie.get("SV%") or 0
                     goalie_gaa = opp_goalie.get("GAA") or 0
                     if goalie_sv > 0 and goalie_gaa > 0:
