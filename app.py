@@ -364,6 +364,17 @@ try:
                 return "background-color: #ff9100; color: black; font-weight: bold"
             else:
                 return ""
+            def color_goalie_match(val):
+            if val >= 70:
+                return "background-color: #00c853; color: white; font-weight: bold"
+            elif val >= 60:
+                return "background-color: #64dd17; color: black; font-weight: bold"
+            elif val >= 50:
+                return "background-color: #ffd600; color: black; font-weight: bold"
+            elif val >= 40:
+                return "background-color: #ff9100; color: black; font-weight: bold"
+            else:
+                return ""    
         
         def anytime_tier(val):
             if val >= 70:
@@ -393,6 +404,11 @@ try:
              color_goal_match,
              subset=["Goal Match"]
          )
+        .map(
+            color_goalie_match,
+            subset=["Goalie Match"]
+        )
+            
          .map(
              color_final_anytime,
              subset=["Final Anytime"]
