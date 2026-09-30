@@ -364,7 +364,7 @@ try:
                 return "background-color: #ff9100; color: black; font-weight: bold"
             else:
                 return ""
-            def color_goalie_match(val):
+        def color_goalie_match(val):
             if val >= 70:
                 return "background-color: #00c853; color: white; font-weight: bold"
             elif val >= 60:
