@@ -342,9 +342,7 @@ try:
                 return "PASS"
 
         skaters_df["Bet Tier"] = skaters_df["Final Anytime"].apply(anytime_tier)
-        bet_tier = skaters_df.pop("Bet Tier")
-        final_col = skaters_df.columns.get_loc("Final Anytime")
-        skaters_df.insert(final_col + 1, "Bet Tier", bet_tier)
+        
         
         st.subheader("🏒 Today's Skaters")
         st.dataframe(
