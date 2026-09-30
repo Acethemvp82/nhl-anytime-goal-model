@@ -316,7 +316,7 @@ try:
 
         for col in ["Rank", "Overall Rank", "Team Rank"]:
             if col in skaters_df.columns:
-            skaters_df = skaters_df.drop(columns=[col])
+                skaters_df = skaters_df.drop(columns=[col])
 
         skaters_df.insert(
             0,
