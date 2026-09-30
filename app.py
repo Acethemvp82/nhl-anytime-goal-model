@@ -254,8 +254,8 @@ try:
                             opponent_side = game_data.get("awayTeam", {})
                     # Use the opponent team's current goalie data
                     if opponent in goalie_map:
-                    opp_goalie = goalie_map[opponent]
-                    opp_goalie_name = opp_goalie.get("Goalie", "Unknown")     
+                          opp_goalie = goalie_map[opponent]
+                          opp_goalie_name = opp_goalie.get("Goalie", "Unknown")     
 
                     goalie_sv = opp_goalie.get("SV%") or 0
                     goalie_gaa = opp_goalie.get("GAA") or 0
