@@ -318,7 +318,17 @@ try:
             "Team Rank",
             skaters_df.groupby("Team").cumcount() + 1
         )
-
+       def color_final_anytime(val):
+           if val >= 70:
+               return "background-color: #00c853; color: white; font-weight: bold"
+           elif val >= 60:
+                return "background-color: #64dd17; color: black; font-weight: bold"
+           elif val >= 50:
+               return "background-color: #ffd600; color: black; font-weight: bold"
+          elif val >= 40:
+              return "background-color: #ff9100; color: black; font-weight: bold"
+          else:
+              return ""
         st.subheader("🏒 Today's Skaters")
         st.dataframe(
             skaters_df,
