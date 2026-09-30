@@ -172,8 +172,8 @@ try:
                 "SV%": 0,
                 "GAA": 0
             } 
-            
-      game_data_map = {}
+        
+    game_data_map = {}       
 
     for team in slate_teams:
              game_id = game_id_map.get(team)
