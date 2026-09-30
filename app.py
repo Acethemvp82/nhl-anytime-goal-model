@@ -247,7 +247,7 @@ try:
                     game_data = game_data_map.get(team, {})
                     game_id = game_id_map.get(team)
                   # Identify opponent goalie from this game's data
-opp_goalie_name = "Unknown"
+                    opp_goalie_name = "Unknown"
 
 if game_data:
     away_team = game_data.get("awayTeam", {}).get("abbrev", "")
