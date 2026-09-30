@@ -34,7 +34,21 @@ def get_team_roster(team):
         return response.json()
 
     return {}
+@st.cache_data(ttl=300)
+def get_game_data(game_id):
+    url = f"https://api-web.nhle.com/v1/gamecenter/{game_id}/boxscore"
 
+    for attempt in range(3):
+        response = requests.get(url, timeout=15)
+
+        if response.status_code == 429:
+            time.sleep(2 * (attempt + 1))
+            continue
+
+        response.raise_for_status()
+        return response.json()
+
+    return {}
 @st.cache_data(ttl=1800)
 def get_player_stats(player_id):
     url = f"https://api-web.nhle.com/v1/player/{player_id}/landing"
@@ -85,6 +99,7 @@ try:
             home = game.get("homeTeam", {}).get("abbrev", "TBD")
 
             games.append({
+                "Game_ID": game.get("id"),
                 "Date": game_date,
                 "Away": away,
                 "Home": home,
@@ -117,11 +132,12 @@ try:
             set(daily_schedule["Away"].tolist() + daily_schedule["Home"].tolist())
         )
         opponent_map = {}
-
+        game_id_map = {}
         for _, game in daily_schedule.iterrows():
             away_team = game["Away"]
             home_team = game["Home"]
-
+            game_id_map[away_team] = game["Game_ID"]
+            game_id_map[home_team] = game["Game_ID"]
             opponent_map[away_team] = home_team
             opponent_map[home_team] = away_team
             # Opponent goals-against per game
@@ -157,7 +173,15 @@ try:
                 "GAA": 0
             } 
             
-            
+         game_data_map = {}
+
+         for team in slate_teams:
+             game_id = game_id_map.get(team)
+
+             if game_id:
+                 game_data_map[team] = get_game_data(game_id)
+             else:
+                 game_data_map[team] = {}   
         skaters = []
 
         for team in slate_teams:
@@ -217,6 +241,39 @@ try:
                     opponent = opponent_map.get(team, "TBD")
                     opp_goalie = goalie_map.get(opponent, {"SV%": 0, "GAA": 0})
                     opp_goalie_name = opp_goalie.get("Goalie", "Unknown")
+                    game_data = game_data_map.get(team, {})
+                    game_id = game_id_map.get(team)
+                    # Pull opponent goalie from the selected game's gamecenter data
+                    if game_data:
+                        away_team = game_data.get("awayTeam", {}).get("abbrev", "")
+                        home_team = game_data.get("homeTeam", {}).get("abbrev", "")
+
+                        if team == away_team:
+                            opponent_side = game_data.get("homeTeam", {})
+                        else:
+                            opponent_side = game_data.get("awayTeam", {})
+                        # Identify opponent starting goalie from boxscore
+                        player_stats = game_data.get("playerByGameStats", {})
+                        
+                        if team == away_team:
+                            opponent_goalies = player_stats.get("homeTeam", {}).get("goalies", [])
+                        else:
+                            opponent_goalies = player_stats.get("awayTeam", {}).get("goalies", [])
+                        
+                        starting_goalie = next(
+                            (g for g in opponent_goalies if g.get("starter") is True),
+                            None
+                        )
+                        
+                        if starting_goalie:
+                            first = starting_goalie.get("name", {}).get("default", "")
+                            if not first:
+                                first = starting_goalie.get("firstName", {}).get("default", "")
+                                last = starting_goalie.get("lastName", {}).get("default", "")
+                                first = f"{first} {last}".strip()
+                        
+                            if first:
+                                opp_goalie_name = first
 
                     goalie_sv = opp_goalie.get("SV%") or 0
                     goalie_gaa = opp_goalie.get("GAA") or 0
