@@ -183,6 +183,8 @@ try:
         goalie_stats = get_goalie_stats(team)
         goalie_data = goalie_stats.get("data", [])
 
+        st.write(team, "GOALIE DATA:", goalie_data)
+
         if goalie_data:
             goalie_row = goalie_data[0]
             goalie_map[team] = {
