@@ -176,7 +176,7 @@ try:
             else:
                 opp_ga_map[team] = 0
 
-                   # Goalie matchup data
+    # Goalie matchup data
     goalie_map = {}
 
     for team in slate_teams:
