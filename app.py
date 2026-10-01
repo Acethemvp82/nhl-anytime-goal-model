@@ -188,7 +188,7 @@ try:
         game_data = game_data_map.get(team, {})
         player_stats = game_data.get("playerByGameStats", {})
 
-             if player_stats:
+        if player_stats:
             away_team = game_data.get("awayTeam", {}).get("abbrev", "")
             side = "awayTeam" if team == away_team else "homeTeam"
             team_game_stats = player_stats.get(side, {})
