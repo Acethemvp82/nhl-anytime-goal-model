@@ -198,7 +198,7 @@ try:
                 goalie = goalies[0]
                 goalie_id = goalie.get("playerId")
                 goalie_stats = get_goalie_stats(goalie_id)
-
+                st.write("GOALIE DEBUG:", goalie.get("name", {}).get("default"), goalie_id, goalie_stats)
                 stats_rows = goalie_stats.get("data", [])
 
                 if stats_rows:
