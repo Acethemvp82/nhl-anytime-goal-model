@@ -144,13 +144,13 @@ try:
             schedule_df["Date"] == selected_date
         ].copy()
 
-        st.subheader(f"🏒 NHL Schedule — {selected_date}")
-        st.dataframe(
+    st.subheader(f"🏒 NHL Schedule — {selected_date}")
+    st.dataframe(
             daily_schedule.drop(columns=["Game_ID"]),
             use_container_width=True,
             hide_index=True
         )
-        slate_teams = sorted(
+    slate_teams = sorted(
             set(daily_schedule["Away"].tolist() + daily_schedule["Home"].tolist())
         )
         opponent_map = {}
