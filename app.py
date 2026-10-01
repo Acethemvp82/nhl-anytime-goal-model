@@ -228,7 +228,7 @@ try:
     for team in slate_teams:
         roster = get_team_roster(team)
         game_data = game_data_map.get(team, {})
-        st.write(team, roster.keys() if roster else "EMPTY ROSTER")
+        st.write(team, "FWD:", len(roster.get("forwards", [])), "DEF:", len(roster.get("defensemen", [])), "G:", len(roster.get("goalies", [])))
         # Get the skaters actually dressed for this game when available
         dressed_ids = set()
 
