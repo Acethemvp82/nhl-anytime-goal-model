@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import requests
 import time
+from datetime import datetime
 from zoneinfo import ZoneInfo
 st.set_page_config(
     page_title="NHL Anytime Goal Model",
@@ -126,10 +127,17 @@ try:
         schedule_df = pd.DataFrame(games)
 
         available_dates = sorted(schedule_df["Date"].unique())
+        today_str = datetime.now().strftime("%Y-%m-%d")
 
+default_index = (
+    available_dates.index(today_str)
+    if today_str in available_dates
+    else len(available_dates) - 1
+)
         selected_date = st.selectbox(
-            "📅 Select Game Date",
-            available_dates
+    "📅 Select Game Date",
+    available_dates,
+    index=default_index
         )
 
         daily_schedule = schedule_df[
