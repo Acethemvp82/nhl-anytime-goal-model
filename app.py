@@ -81,25 +81,15 @@ def get_goalie_stats(player_id):
     current_season = "20262027"
 
     url = (
-        "https://api.nhle.com/stats/rest/en/goalie/summary"
-        f"?cayenneExp=seasonId={current_season}%20and%20teamAbbrev=%22{team}%22"
-        "&sort=%5B%7B%22property%22:%22gamesPlayed%22,%22direction%22:%22DESC%22%7D%5D"
-    )
-
+"https://api.nhle.com/stats/rest/en/goalie/summary"
+    f"?cayenneExp=seasonId={current_season}%20and%20playerId={player_id}"
+)
     try:
         response = requests.get(url, timeout=15)
         response.raise_for_status()
         data = response.json()
 
         goalies = data.get("data", [])
-
-        if goalies:
-            goalies = sorted(
-                goalies,
-                key=lambda g: g.get("gamesPlayed", 0) or 0,
-                reverse=True
-            )
-            data["data"] = goalies
 
         return data
 
