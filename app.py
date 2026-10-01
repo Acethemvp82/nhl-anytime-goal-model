@@ -257,7 +257,7 @@ try:
                 player_stats = get_player_stats(player_id)
                 st.write("PLAYER TEST:", first_name, last_name, bool(player_stats))
                 if not player_stats:
-                st.warning(f"No player stats returned for {first_name} {last_name} ({player_id})")
+                    st.warning(f"No player stats returned for {first_name} {last_name} ({player_id})")
                     featured = player_stats.get("featuredStats", {})
                     season_stats = featured.get("regularSeason", {}).get("subSeason", {})
 
