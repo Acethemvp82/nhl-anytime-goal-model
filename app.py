@@ -77,7 +77,7 @@ def get_team_stats(team):
 
 
 @st.cache_data(ttl=1800)
-def get_goalie_stats(team):
+def get_goalie_stats(player_id):
     current_season = "20262027"
 
     url = (
