@@ -140,7 +140,7 @@ try:
     index=default_index
         )
 
-        daily_schedule = schedule_df[
+    daily_schedule = schedule_df[
             schedule_df["Date"] == selected_date
         ].copy()
 
