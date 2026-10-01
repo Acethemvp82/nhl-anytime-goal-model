@@ -182,8 +182,8 @@ try:
             game_data_map[team] = get_game_data(game_id)
         else:
             game_data_map[team] = {}     
-     # Goalie matchup data from GameCenter
-     goalie_map = {}
+    # Goalie matchup data from GameCenter
+    goalie_map = {}
 
      for team in slate_teams:
         goalie_map[team] = {
