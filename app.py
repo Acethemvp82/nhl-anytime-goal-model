@@ -195,13 +195,26 @@ try:
             goalies = team_game_stats.get("goalies", [])
 
             if goalies:
-                goalie = goalies[0]
-                goalie_map[team] = {
-                    "Goalie": goalie.get("name", {}).get("default", "Unknown"),
-                    "Player_ID": goalie.get("playerId"),
-                    "SV%": 0,
-                    "GAA": 0
-                }
+    goalie = goalies[0]
+    goalie_id = goalie.get("playerId")
+    goalie_stats = get_goalie_stats(goalie_id)
+
+    stats_rows = goalie_stats.get("data", [])
+
+    if stats_rows:
+        season_goalie = stats_rows[0]
+        goalie_sv = season_goalie.get("savePct", 0) or 0
+        goalie_gaa = season_goalie.get("goalsAgainstAverage", 0) or 0
+    else:
+        goalie_sv = 0
+        goalie_gaa = 0
+
+    goalie_map[team] = {
+        "Goalie": goalie.get("name", {}).get("default", "Unknown"),
+        "Player_ID": goalie_id,
+        "SV%": goalie_sv,
+        "GAA": goalie_gaa
+    }
     skaters = []      
 
     for team in slate_teams:
