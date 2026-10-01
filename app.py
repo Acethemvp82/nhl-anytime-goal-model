@@ -52,20 +52,20 @@ def get_game_data(game_id):
 
     return {}
  @st.cache_data(ttl=1800)
-def get_player_stats(player_id):
-    url = f"https://api-web.nhle.com/v1/player/{player_id}/landing"
+ def get_player_stats(player_id):
+     url = f"https://api-web.nhle.com/v1/player/{player_id}/landing"
 
-    for attempt in range(5):
-        try:
-            response = requests.get(url, timeout=15)
+     for attempt in range(5):
+         try:
+             response = requests.get(url, timeout=15)
 
-            if response.status_code == 429:
-                wait_time = 3 * (attempt + 1)
-                time.sleep(wait_time)
-                continue
+             if response.status_code == 429:
+                 wait_time = 3 * (attempt + 1)
+                 time.sleep(wait_time)
+                 continue
 
-            response.raise_for_status()
-            return response.json()
+             response.raise_for_status()
+             return response.json()
 
         except requests.RequestException:
             if attempt < 4:
