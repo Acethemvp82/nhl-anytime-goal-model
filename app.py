@@ -153,9 +153,9 @@ try:
     slate_teams = sorted(
             set(daily_schedule["Away"].tolist() + daily_schedule["Home"].tolist())
         )
-        opponent_map = {}
-        game_id_map = {}
-        for _, game in daily_schedule.iterrows():
+    opponent_map = {}
+    game_id_map = {}
+    for _, game in daily_schedule.iterrows():
             away_team = game["Away"]
             home_team = game["Home"]
             game_id_map[away_team] = game["Game_ID"]
