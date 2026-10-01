@@ -75,16 +75,7 @@ def get_player_stats(player_id):
 
     return {}
 
-        except requests.RequestException:
-            if attempt < 4:
-                time.sleep(2 * (attempt + 1))
-                continue
-            return {}
-
-    return {}  
-
-    
-
+        
 @st.cache_data(ttl=1800)
 def get_team_stats(team):
     url = f"https://api.nhle.com/stats/rest/en/team/summary?cayenneExp=teamAbbrev=%22{team}%22"
