@@ -321,7 +321,7 @@ try:
                         sv_weakness = max(0, min((0.920 - goalie_sv) / 0.050, 1.0)) * 100
                         goalie_match = round(sv_weakness, 1)
                     else:
-                        goalie_match = 0
+                        goalie_match = 50
                     final_anytime = round(
                         (goal_match * 0.75) +
                         (goalie_match * 0.25),
