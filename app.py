@@ -175,30 +175,18 @@ try:
                 opp_ga_map[team] = round(data[0].get("goalsAgainstPerGame", 0), 2)
             else:
                 opp_ga_map[team] = 0
-
-    
-        
-    game_data_map = {}       
-
-    for team in slate_teams:
-             game_id = game_id_map.get(team)
-
-             if game_id:
-                 game_data_map[team] = get_game_data(game_id)
-             else:
-                 game_data_map[team] = {} 
     # Goalie matchup data from GameCenter
     goalie_map = {}
 
     for team in slate_teams:
-        game_data = game_data_map.get(team, {})
-        player_stats = game_data.get("playerByGameStats", {})
-
         goalie_map[team] = {
             "Goalie": "Unknown",
             "SV%": 0,
             "GAA": 0
         }
+
+        game_data = game_data_map.get(team, {})
+        player_stats = game_data.get("playerByGameStats", {})
 
         if player_stats:
             away_team = game_data.get("awayTeam", {}).get("abbrev", "")
@@ -315,10 +303,10 @@ try:
                        opp_goalie = {"SV%": 0, "GAA": 0}
                     goalie_sv = opp_goalie.get("SV%") or 0
                     goalie_gaa = opp_goalie.get("GAA") or 0
-                    if goalie_sv > 0 and goalie_gaa > 0:
-                        sv_weakness = max(0, min((0.920 - goalie_sv) / 0.050, 1.0)) * 50
-                        gaa_weakness = max(0, min(goalie_gaa / 4.0, 1.0)) * 50
-                        goalie_match = round(sv_weakness + gaa_weakness, 1)
+
+                    if goalie_sv > 0:
+                        sv_weakness = max(0, min((0.920 - goalie_sv) / 0.050, 1.0)) * 100
+                        goalie_match = round(sv_weakness, 1)
                     else:
                         goalie_match = 0
                     final_anytime = round(
