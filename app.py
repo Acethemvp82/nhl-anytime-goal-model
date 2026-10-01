@@ -185,7 +185,7 @@ try:
     # Goalie matchup data from GameCenter
     goalie_map = {}
 
-     for team in slate_teams:
+    for team in slate_teams:
         goalie_map[team] = {
             "Goalie": "Unknown",
             "Player_ID": None,
