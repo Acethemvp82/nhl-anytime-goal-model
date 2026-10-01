@@ -134,7 +134,7 @@ try:
         if today_str in available_dates
         else len(available_dates) - 1
     )
-        selected_date = st.selectbox(
+    selected_date = st.selectbox(
     "📅 Select Game Date",
     available_dates,
     index=default_index
