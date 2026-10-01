@@ -89,12 +89,10 @@ def get_goalie_stats(team):
     response.raise_for_status()
    
     return response.json()
-
+games = []
 try:
     schedule_data = get_nhl_schedule()
-
-    games = []
-
+    
     for week in schedule_data.get("gameWeek", []):   
         game_date = week.get("date", "")
         
