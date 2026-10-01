@@ -254,42 +254,44 @@ try:
                 player_stats = get_player_stats(player_id)
                 st.write("PLAYER TEST:", first_name, last_name, bool(player_stats))
         
-                    # Dressed-player filter temporarily disabled
-                    # if dressed_ids and player_id not in dressed_ids:
-                    #     continue
-                    if not player_stats:
-                        st.warning(f"No player stats returned for {first_name} {last_name} ({player_id})")
-                        featured = player_stats.get("featuredStats", {})
-                        season_stats = featured.get("regularSeason", {}).get("subSeason", {})
-    
-                        games_played = season_stats.get("gamesPlayed") or 0
-                        goals = season_stats.get("goals") or 0
-                        shots = season_stats.get("shots") or 0
-    
-                        if games_played == 0:
-                            career_stats = featured.get("regularSeason", {}).get("career", {})
-                            games_played = career_stats.get("gamesPlayed") or 0
-                            goals = career_stats.get("goals") or 0
-                            shots = career_stats.get("shots") or 0
-    
-                        goals_per_game = round(goals / games_played, 3) if games_played else 0
-                        shots_per_game = round(shots / games_played, 2) if games_played else 0
-                        opponent = opponent_map.get(team, "TBD")
-                        opponent_stats = get_team_stats(opponent)
-    
-                        opponent_data = opponent_stats.get("data", [])
-    
-                        if opponent_data:
-                            opponent_row = opponent_data[0]
-                            opp_goals_against = opponent_row.get("goalsAgainst", 0)
-                            opp_games_played = opponent_row.get("gamesPlayed", 0)
-    
-                            opp_ga_per_game = (
-                                round(opp_goals_against / opp_games_played, 2)
-                                if opp_games_played else 0
-                            )
-                        else:
-                            opp_ga_per_game = 0
+                # Dressed-player filter temporarily disabled
+                # if dressed_ids and player_id not in dressed_ids:
+                #     continue
+            if not player_stats:
+                st.warning(f"No player stats returned for {first_name} {last_name} ({player_id})")
+                continue
+
+            featured = player_stats.get("featuredStats", {})
+            season_stats = featured.get("regularSeason", {}).get("subSeason", {})
+
+            games_played = season_stats.get("gamesPlayed") or 0
+            goals = season_stats.get("goals") or 0
+            shots = season_stats.get("shots") or 0
+
+            if games_played == 0:
+                career_stats = featured.get("regularSeason", {}).get("career", {})
+                games_played = career_stats.get("gamesPlayed") or 0
+                goals = career_stats.get("goals") or 0
+                shots = career_stats.get("shots") or 0
+
+            goals_per_game = round(goals / games_played, 3) if games_played else 0
+            shots_per_game = round(shots / games_played, 2) if games_played else 0
+            opponent = opponent_map.get(team, "TBD")
+            opponent_stats = get_team_stats(opponent)
+
+            opponent_data = opponent_stats.get("data", [])
+
+            if opponent_data:
+                opponent_row = opponent_data[0]
+                opp_goals_against = opponent_row.get("goalsAgainst", 0)
+                opp_games_played = opponent_row.get("gamesPlayed", 0)
+
+                opp_ga_per_game = (
+                    round(opp_goals_against / opp_games_played, 2)
+                    if opp_games_played else 0
+                )
+            else:
+                opp_ga_per_game = 0
     
                         goal_rate_score = min(goals_per_game / 0.60, 1.0) * 50
                         shot_rate_score = min(shots_per_game / 4.0, 1.0) * 50
