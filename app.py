@@ -198,7 +198,7 @@ try:
                 goalie = goalies[0]
                 goalie_id = goalie.get("playerId")
                 goalie_stats = get_goalie_stats(goalie_id)
-                st.write("GOALIE DEBUG:", goalie.get("name", {}).get("default"), goalie_id, goalie_stats)
+                
                 stats_rows = goalie_stats.get("data", [])
 
                 if stats_rows:
@@ -309,14 +309,13 @@ try:
                 
                     # Use current-season goalie stats when available
                     if opponent in goalie_map:
-                        opp_goalie = goalie_map[opponent]
-                        opp_goalie_name = opp_goalie.get("Goalie", "Unknown")                                                           
-                    
-                                                                           
-                    if opponent not in goalie_map:
-                       opp_goalie = {"SV%": 0, "GAA": 0}
-                    goalie_sv = opp_goalie.get("SV%") or 0
-                    goalie_gaa = opp_goalie.get("GAA") or 0
+    opp_goalie = goalie_map[opponent]
+    opp_goalie_name = opp_goalie.get("Goalie", "Unknown")
+else:
+    opp_goalie = {"SV%": 0, "GAA": 0}
+
+                    goalie_sv = opp_goalie.get("SV%", 0) or 0
+                    goalie_gaa = opp_goalie.get("GAA", 0) or 0
 
                     if goalie_sv > 0:
                         sv_weakness = max(0, min((0.920 - goalie_sv) / 0.050, 1.0)) * 100
