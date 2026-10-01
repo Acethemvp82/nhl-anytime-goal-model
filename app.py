@@ -312,7 +312,7 @@ try:
                         opp_goalie = goalie_map[opponent]
                         opp_goalie_name = opp_goalie.get("Goalie", "Unknown")
                     else:
-                    opp_goalie = {"SV%": 0, "GAA": 0}
+                        opp_goalie = {"SV%": 0, "GAA": 0}
 
                     goalie_sv = opp_goalie.get("SV%", 0) or 0
                     goalie_gaa = opp_goalie.get("GAA", 0) or 0
