@@ -190,6 +190,7 @@ try:
     for team in slate_teams:
         goalie_map[team] = {
             "Goalie": "Unknown",
+            "Player_ID": None,
             "SV%": 0,
             "GAA": 0
         }
@@ -207,7 +208,8 @@ try:
                 goalie = goalies[0]
                 goalie_map[team] = {
                     "Goalie": goalie.get("name", {}).get("default", "Unknown"),
-                    "SV%": goalie.get("savePctg", 0) or 0,
+                    "Player_ID": goalie.get("playerId"),
+                    "SV%": 0,
                     "GAA": 0
                 }
     skaters = []      
