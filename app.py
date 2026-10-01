@@ -205,6 +205,7 @@ try:
 
             if goalies:
                 goalie = goalies[0]
+                st.write("GOALIE DEBUG:", team, goalie)
                 goalie_map[team] = {
                     "Goalie": goalie.get("name", {}).get("default", "Unknown"),
                     "SV%": goalie.get("savePctg", 0) or 0,
