@@ -176,28 +176,7 @@ try:
             else:
                 opp_ga_map[team] = 0
 
-    # Goalie matchup data
-    goalie_map = {}
-
-    for team in slate_teams:
-        goalie_stats = get_goalie_stats(team)
-        goalie_data = goalie_stats.get("data", [])
-
-        
-
-        if goalie_data:
-            goalie_row = goalie_data[0]
-            goalie_map[team] = {
-               "Goalie": goalie_row.get("goalieFullName", "Unknown"), 
-                "SV%": goalie_row.get("savePct", 0),
-                "GAA": goalie_row.get("goalsAgainstAverage", 0)
-            }
-        else:
-            goalie_map[team] = {
-                "Goalie": "Unknown",
-                "SV%": 0,
-                "GAA": 0
-            } 
+    
         
     game_data_map = {}       
 
@@ -208,7 +187,32 @@ try:
                  game_data_map[team] = get_game_data(game_id)
              else:
                  game_data_map[team] = {} 
-   
+    # Goalie matchup data from GameCenter
+    goalie_map = {}
+
+    for team in slate_teams:
+        game_data = game_data_map.get(team, {})
+        player_stats = game_data.get("playerByGameStats", {})
+
+        goalie_map[team] = {
+            "Goalie": "Unknown",
+            "SV%": 0,
+            "GAA": 0
+        }
+
+        if player_stats:
+            away_team = game_data.get("awayTeam", {}).get("abbrev", "")
+            side = "awayTeam" if team == away_team else "homeTeam"
+            team_game_stats = player_stats.get(side, {})
+            goalies = team_game_stats.get("goalies", [])
+
+            if goalies:
+                goalie = goalies[0]
+                goalie_map[team] = {
+                    "Goalie": goalie.get("name", {}).get("default", "Unknown"),
+                    "SV%": goalie.get("savePctg", 0) or 0,
+                    "GAA": 0
+                }
     skaters = []      
 
     for team in slate_teams:
