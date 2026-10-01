@@ -245,10 +245,10 @@ try:
                     if player_id:
                         dressed_ids.add(player_id)   
             
-            for position_group in ["forwards", "defensemen"]:
-                for player in roster.get(position_group, []):
-                    first_name = player.get("firstName", {}).get("default", "")
-                    last_name = player.get("lastName", {}).get("default", "")
+        for position_group in ["forwards", "defensemen"]:
+            for player in roster.get(position_group, []):
+                first_name = player.get("firstName", {}).get("default", "")
+                last_name = player.get("lastName", {}).get("default", "")
                     position = player.get("positionCode", "")
                     player_id = player.get("id")
                     # If dressed skaters are available, skip scratches/non-starters
