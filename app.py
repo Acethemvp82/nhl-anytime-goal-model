@@ -251,12 +251,13 @@ try:
                 last_name = player.get("lastName", {}).get("default", "")
             position = player.get("positionCode", "")
             player_id = player.get("id")
-            # If dressed skaters are available, skip scratches/non-starters
-            if dressed_ids and player_id not in dressed_ids:
-                continue
-                player_stats = get_player_stats(player_id)
-                st.write("PLAYER TEST:", first_name, last_name, bool(player_stats))
-                if not player_stats:
+           player_stats = get_player_stats(player_id)
+           st.write("PLAYER TEST:", first_name, last_name, bool(player_stats))
+
+           # If dressed skaters are available, skip scratches/non-starters
+           if dressed_ids and player_id not in dressed_ids:
+               continue
+           if not player_stats:
                     st.warning(f"No player stats returned for {first_name} {last_name} ({player_id})")
                     featured = player_stats.get("featuredStats", {})
                     season_stats = featured.get("regularSeason", {}).get("subSeason", {})
