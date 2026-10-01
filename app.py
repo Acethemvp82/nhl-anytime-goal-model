@@ -183,7 +183,7 @@ try:
         goalie_stats = get_goalie_stats(team)
         goalie_data = goalie_stats.get("data", [])
 
-        st.write(team, "GOALIE DATA:", goalie_data)
+        
 
         if goalie_data:
             goalie_row = goalie_data[0]
@@ -207,7 +207,8 @@ try:
              if game_id:
                  game_data_map[team] = get_game_data(game_id)
              else:
-                 game_data_map[team] = {}   
+                 game_data_map[team] = {} 
+    st.write("GAME DATA TEST:", game_data_map)
     skaters = []      
 
     for team in slate_teams:
