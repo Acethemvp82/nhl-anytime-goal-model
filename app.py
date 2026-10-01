@@ -173,9 +173,9 @@ try:
                 opp_ga_map[team] = round(data[0].get("goalsAgainstPerGame", 0), 2)
             else:
                 opp_ga_map[team] = 0
-     game_data_map = {}
+    game_data_map = {}
 
-     for team in slate_teams:
+    for team in slate_teams:
         game_id = game_id_map.get(team)
 
         if game_id:
