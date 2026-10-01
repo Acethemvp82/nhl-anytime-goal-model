@@ -151,8 +151,8 @@ try:
             hide_index=True
         )
     slate_teams = sorted(
-            set(daily_schedule["Away"].tolist() + daily_schedule["Home"].tolist())
-        )
+    set(daily_schedule["Away"].tolist() + daily_schedule["Home"].tolist())
+    )
     opponent_map = {}
     game_id_map = {}
     for _, game in daily_schedule.iterrows():
