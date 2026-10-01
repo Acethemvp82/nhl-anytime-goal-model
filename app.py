@@ -234,6 +234,7 @@ try:
 
     for team in slate_teams:
         roster = get_team_roster(team)
+        st.write(team, "forwards:", len(roster.get("forwards", [])), "defensemen:", len(roster.get("defensemen", [])))
         game_data = game_data_map.get(team, {})
         
           
