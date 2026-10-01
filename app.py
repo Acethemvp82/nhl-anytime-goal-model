@@ -129,11 +129,11 @@ try:
         available_dates = sorted(schedule_df["Date"].unique())
         today_str = datetime.now().strftime("%Y-%m-%d")
 
-default_index = (
-    available_dates.index(today_str)
-    if today_str in available_dates
-    else len(available_dates) - 1
-)
+    default_index = (
+        available_dates.index(today_str)
+        if today_str in available_dates
+        else len(available_dates) - 1
+    )
         selected_date = st.selectbox(
     "📅 Select Game Date",
     available_dates,
