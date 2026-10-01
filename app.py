@@ -163,7 +163,7 @@ try:
             opponent_map[away_team] = home_team
             opponent_map[home_team] = away_team
             # Opponent goals-against per game
-    pp_ga_map = {}
+     pp_ga_map = {}
 
         for team in slate_teams:
             team_stats = get_team_stats(team)
@@ -173,19 +173,19 @@ try:
                 opp_ga_map[team] = round(data[0].get("goalsAgainstPerGame", 0), 2)
             else:
                 opp_ga_map[team] = 0
-    game_data_map = {}
+     game_data_map = {}
 
-    for team in slate_teams:
+     for team in slate_teams:
         game_id = game_id_map.get(team)
 
         if game_id:
             game_data_map[team] = get_game_data(game_id)
         else:
             game_data_map[team] = {}     
-    # Goalie matchup data from GameCenter
-    goalie_map = {}
+     # Goalie matchup data from GameCenter
+     goalie_map = {}
 
-    for team in slate_teams:
+     for team in slate_teams:
         goalie_map[team] = {
             "Goalie": "Unknown",
             "Player_ID": None,
