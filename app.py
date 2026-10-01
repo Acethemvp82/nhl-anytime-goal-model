@@ -309,8 +309,8 @@ try:
                 
                     # Use current-season goalie stats when available
                     if opponent in goalie_map:
-                    opp_goalie = goalie_map[opponent]
-                    opp_goalie_name = opp_goalie.get("Goalie", "Unknown")
+                        opp_goalie = goalie_map[opponent]
+                        opp_goalie_name = opp_goalie.get("Goalie", "Unknown")
                     else:
                     opp_goalie = {"SV%": 0, "GAA": 0}
 
