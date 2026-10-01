@@ -163,7 +163,7 @@ try:
             opponent_map[away_team] = home_team
             opponent_map[home_team] = away_team
             # Opponent goals-against per game
-      pp_ga_map = {}
+       pp_ga_map = {}
 
         for team in slate_teams:
             team_stats = get_team_stats(team)
