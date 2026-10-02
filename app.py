@@ -149,7 +149,7 @@ try:
         schedule_df = pd.DataFrame(games)
 
         available_dates = sorted(schedule_df["Date"].unique())
-        today_str = datetime.now().strftime("%Y-%m-%d")
+        today_str = datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d")
 
     default_index = (
         available_dates.index(today_str)
