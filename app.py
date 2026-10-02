@@ -279,9 +279,8 @@ if games:
                
         
                 # Only use dressed skaters when GameCenter provides them
-               if dressed_ids and player_id not in dressed_ids:
-                   continue
-                 
+                if dressed_ids and player_id not in dressed_ids:
+                    continue
 
     
                 featured = player_stats.get("featuredStats", {})
