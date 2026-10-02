@@ -518,10 +518,7 @@ if games:
         )
     else:
         st.warning("No NHL games found.")
-
-except Exception as e:
-    st.error(f"Could not load NHL schedule: {e}")
-           
+       
 
     if games:
         schedule_df = pd.DataFrame(games)
