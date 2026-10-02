@@ -251,112 +251,112 @@ try:
                 # Dressed-player filter temporarily disabled
                 # if dressed_ids and player_id not in dressed_ids:
                 #     continue
-            if not player_stats:
-                st.warning(f"No player stats returned for {first_name} {last_name} ({player_id})")
-                continue
-
-            featured = player_stats.get("featuredStats", {})
-            season_stats = featured.get("regularSeason", {}).get("subSeason", {})
-
-            games_played = season_stats.get("gamesPlayed") or 0
-            goals = season_stats.get("goals") or 0
-            shots = season_stats.get("shots") or 0
-
-            if games_played == 0:
-                career_stats = featured.get("regularSeason", {}).get("career", {})
-                games_played = career_stats.get("gamesPlayed") or 0
-                goals = career_stats.get("goals") or 0
-                shots = career_stats.get("shots") or 0
-
-            goals_per_game = round(goals / games_played, 3) if games_played else 0
-            shots_per_game = round(shots / games_played, 2) if games_played else 0
-            opponent = opponent_map.get(team, "TBD")
-            opponent_stats = get_team_stats(opponent)
-
-            opponent_data = opponent_stats.get("data", [])
-
-            if opponent_data:
-                opponent_row = opponent_data[0]
-                opp_goals_against = opponent_row.get("goalsAgainst", 0)
-                opp_games_played = opponent_row.get("gamesPlayed", 0)
-
-                opp_ga_per_game = (
-                    round(opp_goals_against / opp_games_played, 2)
-                    if opp_games_played else 0
-                )
-            else:
-                opp_ga_per_game = 0
+                if not player_stats:
+                    st.warning(f"No player stats returned for {first_name} {last_name} ({player_id})")
+                    continue
     
-            goal_rate_score = min(goals_per_game / 0.60, 1.0) * 50
-            shot_rate_score = min(shots_per_game / 4.0, 1.0) * 50
-
-            goal_threat = round(goal_rate_score + shot_rate_score, 1)
-            matchup_score = min(opp_ga_per_game / 4.0, 1.0) * 100
-
-            goal_match = round(
-                (goal_threat * 0.70) +
-                (matchup_score * 0.30),
-                1
-            )
-
-            opponent = opponent_map.get(team, "TBD")
-            opp_goalie = goalie_map.get(opponent, {"SV%": 0, "GAA": 0})
-            opp_goalie_name = opp_goalie.get("Goalie", "Unknown")
-            game_data = game_data_map.get(team, {})
-            game_id = game_id_map.get(team)
-
-            # Identify opponent goalie from this game's data
-            opp_goalie_name = "Unknown"
-
-            if game_data:
-                away_team = game_data.get("awayTeam", {}).get("abbrev", "")
-                home_team = game_data.get("homeTeam", {}).get("abbrev", "")
-
-                if team == away_team:
-                    opponent_side = game_data.get("homeTeam", {})
+                featured = player_stats.get("featuredStats", {})
+                season_stats = featured.get("regularSeason", {}).get("subSeason", {})
+    
+                games_played = season_stats.get("gamesPlayed") or 0
+                goals = season_stats.get("goals") or 0
+                shots = season_stats.get("shots") or 0
+    
+                if games_played == 0:
+                    career_stats = featured.get("regularSeason", {}).get("career", {})
+                    games_played = career_stats.get("gamesPlayed") or 0
+                    goals = career_stats.get("goals") or 0
+                    shots = career_stats.get("shots") or 0
+    
+                goals_per_game = round(goals / games_played, 3) if games_played else 0
+                shots_per_game = round(shots / games_played, 2) if games_played else 0
+                opponent = opponent_map.get(team, "TBD")
+                opponent_stats = get_team_stats(opponent)
+    
+                opponent_data = opponent_stats.get("data", [])
+    
+                if opponent_data:
+                    opponent_row = opponent_data[0]
+                    opp_goals_against = opponent_row.get("goalsAgainst", 0)
+                    opp_games_played = opponent_row.get("gamesPlayed", 0)
+    
+                    opp_ga_per_game = (
+                        round(opp_goals_against / opp_games_played, 2)
+                        if opp_games_played else 0
+                    )
                 else:
-                    opponent_side = game_data.get("awayTeam", {})
-
-            # Use current-season goalie stats when available
-            if opponent in goalie_map:
-                opp_goalie = goalie_map[opponent]
+                    opp_ga_per_game = 0
+        
+                goal_rate_score = min(goals_per_game / 0.60, 1.0) * 50
+                shot_rate_score = min(shots_per_game / 4.0, 1.0) * 50
+    
+                goal_threat = round(goal_rate_score + shot_rate_score, 1)
+                matchup_score = min(opp_ga_per_game / 4.0, 1.0) * 100
+    
+                goal_match = round(
+                    (goal_threat * 0.70) +
+                    (matchup_score * 0.30),
+                    1
+                )
+    
+                opponent = opponent_map.get(team, "TBD")
+                opp_goalie = goalie_map.get(opponent, {"SV%": 0, "GAA": 0})
                 opp_goalie_name = opp_goalie.get("Goalie", "Unknown")
-            else:
-                opp_goalie = {"SV%": 0, "GAA": 0}
-
-            goalie_sv = opp_goalie.get("SV%", 0) or 0
-            goalie_gaa = opp_goalie.get("GAA", 0) or 0
-
-            if goalie_sv > 0:
-                sv_weakness = max(0, min((0.920 - goalie_sv) / 0.050, 1.0))
-                goalie_match = round(sv_weakness, 1)
-            else:
-                goalie_match = 50
-
-            final_anytime = round(
-                (goal_match * 0.75) +
-                (goalie_match * 0.25),
-                1
-            )
-
-            skaters.append({
-                "Player": f"{first_name} {last_name}".strip(),
-                "Team": team,
-                "Opponent": opponent_map.get(team, "TBD"),
-                "Opp GA/GP": opp_ga_map.get(opponent_map.get(team, ""), 0),
-                "Goal Threat": goal_threat,
-                "Goal Match": goal_match,
-                "Final Anytime": final_anytime,
-                "Goalie Match": goalie_match,
-                "Opp Goalie": opp_goalie_name,
-                "Position": position,
-                "GP": games_played,
-                "Goals": goals,
-                "G/GP": goals_per_game,
-                "Shots": shots,
-                "S/GP": shots_per_game,
-                "Player_ID": player_id
-            })          
+                game_data = game_data_map.get(team, {})
+                game_id = game_id_map.get(team)
+    
+                # Identify opponent goalie from this game's data
+                opp_goalie_name = "Unknown"
+    
+                if game_data:
+                    away_team = game_data.get("awayTeam", {}).get("abbrev", "")
+                    home_team = game_data.get("homeTeam", {}).get("abbrev", "")
+    
+                    if team == away_team:
+                        opponent_side = game_data.get("homeTeam", {})
+                    else:
+                        opponent_side = game_data.get("awayTeam", {})
+    
+                # Use current-season goalie stats when available
+                if opponent in goalie_map:
+                    opp_goalie = goalie_map[opponent]
+                    opp_goalie_name = opp_goalie.get("Goalie", "Unknown")
+                else:
+                    opp_goalie = {"SV%": 0, "GAA": 0}
+    
+                goalie_sv = opp_goalie.get("SV%", 0) or 0
+                goalie_gaa = opp_goalie.get("GAA", 0) or 0
+    
+                if goalie_sv > 0:
+                    sv_weakness = max(0, min((0.920 - goalie_sv) / 0.050, 1.0))
+                    goalie_match = round(sv_weakness, 1)
+                else:
+                    goalie_match = 50
+    
+                final_anytime = round(
+                    (goal_match * 0.75) +
+                    (goalie_match * 0.25),
+                    1
+                )
+    
+                skaters.append({
+                    "Player": f"{first_name} {last_name}".strip(),
+                    "Team": team,
+                    "Opponent": opponent_map.get(team, "TBD"),
+                    "Opp GA/GP": opp_ga_map.get(opponent_map.get(team, ""), 0),
+                    "Goal Threat": goal_threat,
+                    "Goal Match": goal_match,
+                    "Final Anytime": final_anytime,
+                    "Goalie Match": goalie_match,
+                    "Opp Goalie": opp_goalie_name,
+                    "Position": position,
+                    "GP": games_played,
+                    "Goals": goals,
+                    "G/GP": goals_per_game,
+                    "Shots": shots,
+                    "S/GP": shots_per_game,
+                    "Player_ID": player_id
+                })          
            
                         
                         
