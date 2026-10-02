@@ -256,7 +256,7 @@ if games:
         dressed_ids = set()
 
         player_by_game = game_data.get("playerByGameStats", {})
-        st.write("DEBUG", team, "playerByGameStats:", player_by_game)
+        
         if player_by_game:
            away_team = game_data.get("awayTeam", {}).get("abbrev", "")
            side = "awayTeam" if team == away_team else "homeTeam"
