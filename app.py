@@ -234,8 +234,8 @@ try:
 
     for team in slate_teams:
         roster = get_team_roster(team)
-        st.write(team, "forwards:", len(roster.get("forwards", [])), "defensemen:", len(roster.get("defensemen", [])))
         game_data = game_data_map.get(team, {})
+        
         
           
             
@@ -246,14 +246,14 @@ try:
                 position = player.get("positionCode", "")
                 player_id = player.get("id")
                 player_stats = get_player_stats(player_id)
-                st.write(team, first_name, last_name, "stats:", bool(player_stats))
+               
         
                 # Dressed-player filter temporarily disabled
                 # if dressed_ids and player_id not in dressed_ids:
                 #     continue
                 if not player_stats:
-                    st.warning(f"No player stats returned for {first_name} {last_name} ({player_id})")
                     continue
+
     
                 featured = player_stats.get("featuredStats", {})
                 season_stats = featured.get("regularSeason", {}).get("subSeason", {})
