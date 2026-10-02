@@ -251,21 +251,21 @@ try:
         roster = get_team_roster(team)
         game_data = game_data_map.get(team, {})
         
-# Get dressed skaters from GameCenter when available
-dressed_ids = set()
+        # Get dressed skaters from GameCenter when available
+        dressed_ids = set()
 
-player_by_game = game_data.get("playerByGameStats", {})
+        player_by_game = game_data.get("playerByGameStats", {})
 
-if player_by_game:
-    away_team = game_data.get("awayTeam", {}).get("abbrev", "")
-    side = "awayTeam" if team == away_team else "homeTeam"
-    team_game_stats = player_by_game.get(side, {})
+        if player_by_game:
+           away_team = game_data.get("awayTeam", {}).get("abbrev", "")
+           side = "awayTeam" if team == away_team else "homeTeam"
+           team_game_stats = player_by_game.get(side, {})
 
-    for group in ["forwards", "defense"]:
-        for dressed_player in team_game_stats.get(group, []):
-            player_id = dressed_player.get("playerId")
-            if player_id:
-                dressed_ids.add(player_id) 
+           for group in ["forwards", "defense"]:
+               for dressed_player in team_game_stats.get(group, []):
+                   player_id = dressed_player.get("playerId")
+                   if player_id:
+                       dressed_ids.add(player_id) 
           
             
         for position_group in ["forwards", "defensemen"]:
