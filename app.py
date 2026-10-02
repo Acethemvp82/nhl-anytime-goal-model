@@ -142,11 +142,12 @@ try:
                 "Time": start_time,
                 "Status": game.get("gameState", "")
             })
-            
+except requests.RequestException as e:
+    st.error(f"Could not load NHL schedule: {e}")
                 
 
-    if games:
-        schedule_df = pd.DataFrame(games)
+if games:
+    schedule_df = pd.DataFrame(games)
 
         available_dates = sorted(schedule_df["Date"].unique())
         today_str = datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d")
