@@ -177,12 +177,15 @@ if games:
     set(daily_schedule["Away"].tolist() + daily_schedule["Home"].tolist())
     )
     opponent_map = {}
-    game_id_map = {}
+    game_id_map = {} 
+    game_time_map = {}
     for _, game in daily_schedule.iterrows():
             away_team = game["Away"]
             home_team = game["Home"]
             game_id_map[away_team] = game["Game_ID"]
             game_id_map[home_team] = game["Game_ID"]
+            game_time_map[away_team] = game["Time"]
+            game_time_map[home_team] = game["Time"]
             opponent_map[away_team] = home_team
             opponent_map[home_team] = away_team
             # Opponent goals-against per game
@@ -376,6 +379,7 @@ if games:
                     "Player": f"{first_name} {last_name}".strip(),
                     "Team": team,
                     "Opponent": opponent_map.get(team, "TBD"),
+                    "Game Time": game_time_map.get(team, "TBD"),
                     "Opp GA/GP": opp_ga_map.get(opponent_map.get(team, ""), 0),
                     "Goal Threat": goal_threat,
                     "Goal Match": goal_match,
@@ -489,6 +493,9 @@ if games:
         cols.remove("Bet Tier")
         final_idx = cols.index("Final Anytime")
         cols.insert(final_idx + 1, "Bet Tier")
+        cols.remove("Game Time")
+        team_idx = cols.index("Team")
+        cols.insert(team_idx + 1, "Game Time")
         display_df = display_df[cols]
         st.subheader("🏒 Today's Skaters")
         st.dataframe(
