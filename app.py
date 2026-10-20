@@ -229,7 +229,9 @@ if games:
             goalies = team_game_stats.get("goalies", [])
 
             if goalies:
-                goalie = goalies[0]
+                goalie = next((g for g in goalies if g.get("starter") is True), None)
+                if goalie is None:
+                    continue  # Never label the first listed goalie as the confirmed starter
                 goalie_id = goalie.get("playerId")
                 goalie_stats = get_goalie_stats(goalie_id)
                 
@@ -365,7 +367,7 @@ if games:
     
                 if goalie_sv > 0:
                     sv_weakness = max(0, min((0.920 - goalie_sv) / 0.050, 1.0))
-                    goalie_match = round(sv_weakness, 1)
+                    goalie_match = round(sv_weakness * 100, 1)
                 else:
                     goalie_match = 50
     
@@ -387,6 +389,7 @@ if games:
                     "Goals": goals,
                     "Goalie Match": goalie_match,
                     "Opp Goalie": opp_goalie_name,
+                    "Lineup Status": "GameCenter" if dressed_ids else "Unconfirmed",
                     "Position": position,
                     "GP": games_played,
                     "G/GP": goals_per_game,
