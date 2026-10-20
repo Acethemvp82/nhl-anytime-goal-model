@@ -216,7 +216,8 @@ if games:
             "Goalie": "Unknown",
             "Player_ID": None,
             "SV%": 0,
-            "GAA": 0
+            "GAA": 0,
+            "Status": "Unknown"
         }
 
         game_data = game_data_map.get(team, {})
@@ -230,8 +231,11 @@ if games:
 
             if goalies:
                 goalie = next((g for g in goalies if g.get("starter") is True), None)
+                if goalie is None and len(goalies) == 1:
+                    goalie = goalies[0]  # Listed goalie, NOT confirmed as starter
                 if goalie is None:
-                    continue  # Never label the first listed goalie as the confirmed starter
+                    continue
+                goalie_status = "Confirmed" if goalie.get("starter") is True else "Listed (unconfirmed)"
                 goalie_id = goalie.get("playerId")
                 goalie_stats = get_goalie_stats(goalie_id)
                 
@@ -249,7 +253,8 @@ if games:
                     "Goalie": goalie.get("name", {}).get("default", "Unknown"),
                     "Player_ID": goalie_id,
                     "SV%": goalie_sv,
-                    "GAA": goalie_gaa
+                    "GAA": goalie_gaa,
+                    "Status": goalie_status
                 }
     skaters = []      
 
@@ -389,6 +394,7 @@ if games:
                     "Goals": goals,
                     "Goalie Match": goalie_match,
                     "Opp Goalie": opp_goalie_name,
+                    "Goalie Status": opp_goalie.get("Status", "Unknown"),
                     "Lineup Status": "GameCenter" if dressed_ids else "Unconfirmed",
                     "Position": position,
                     "GP": games_played,
@@ -476,13 +482,13 @@ if games:
                 return ""    
         
         def anytime_tier(val):
-            if val >= 70:
+            if val >= 80:
                 return "🔥 ELITE"
-            elif val >= 60:
+            elif val >= 70:
                 return "🟢 STRONG"
-            elif val >= 50:
+            elif val >= 60:
                 return "🟡 GOOD"
-            elif val >= 40:
+            elif val >= 50:
                 return "🟠 LEAN"
             else:
                 return "PASS"
