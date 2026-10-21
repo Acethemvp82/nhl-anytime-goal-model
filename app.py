@@ -230,14 +230,14 @@ if games:
             goalies = team_game_stats.get("goalies", [])
 
             if goalies:
+                # GameCenter often lists goalies before it flags a starter.
+                # Display the first listed goalie as UNCONFIRMED, never as confirmed.
                 goalie = next((g for g in goalies if g.get("starter") is True), None)
-                if goalie is None and len(goalies) == 1:
-                    goalie = goalies[0]  # Listed goalie, NOT confirmed as starter
+                goalie_status = "Confirmed" if goalie else "Listed (unconfirmed)"
                 if goalie is None:
-                    continue
-                goalie_status = "Confirmed" if goalie.get("starter") is True else "Listed (unconfirmed)"
+                    goalie = goalies[0]
                 goalie_id = goalie.get("playerId")
-                goalie_stats = get_goalie_stats(goalie_id)
+                goalie_stats = get_goalie_stats(goalie_id) if goalie_id else {"data": []}
                 
                 stats_rows = goalie_stats.get("data", [])
 
@@ -249,8 +249,17 @@ if games:
                     goalie_sv = 0
                     goalie_gaa = 0
 
+                goalie_name = goalie.get("name", {})
+                if isinstance(goalie_name, dict):
+                    goalie_name = goalie_name.get("default", "")
+                if not goalie_name:
+                    first = goalie.get("firstName", {})
+                    last = goalie.get("lastName", {})
+                    first = first.get("default", "") if isinstance(first, dict) else first
+                    last = last.get("default", "") if isinstance(last, dict) else last
+                    goalie_name = f"{first} {last}".strip()
                 goalie_map[team] = {
-                    "Goalie": goalie.get("name", {}).get("default", "Unknown"),
+                    "Goalie": goalie_name or "Unknown",
                     "Player_ID": goalie_id,
                     "SV%": goalie_sv,
                     "GAA": goalie_gaa,
