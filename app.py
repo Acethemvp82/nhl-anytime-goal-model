@@ -642,13 +642,16 @@ if games:
             )
 
         st.dataframe(
-            skaters_df[main_columns].style
+            skaters_df[main_columns].replace({None: float("nan")}).style
             .map(color_goal_threat, subset=["Goal Threat"])
             .map(color_goal_match, subset=["Goal Match"])
             .map(color_goalie_match, subset=["Goalie Match"])
             .map(color_final_anytime, subset=["Final Anytime"])
             .format({
                 "Goal Threat": "{:.1f}",
+                "L5 S/GP": "{:.0f}",
+                "L10 S/GP": "{:.0f}",
+                "Shot Trend": "{:+.0f}",
                 "Goal Match": "{:.1f}",
                 "Goalie Match": "{:.1f}",
                 "Final Anytime": "{:.1f}",
