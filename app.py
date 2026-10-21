@@ -643,7 +643,8 @@ if games:
         st.subheader("🎯 Top 5 Goal Scorer Shortlist")
         st.caption(
             "Top five players by the existing Final Anytime ranking. "
-            "These are model candidates, not guaranteed scorers or calibrated probabilities."
+            "These are model candidates, not guaranteed scorers or calibrated probabilities. "
+            "Sample Check flags early-season volatility; it does not change the score."
         )
         shortlist = skaters_df.head(5).copy()
         shortlist["Lineup Check"] = shortlist["Lineup Status"].apply(
@@ -654,11 +655,18 @@ if games:
             lambda source: "⚠️ Neutral fallback"
             if source != "Season SV%" else "Season SV% available"
         )
+        # Early-season rates can be unstable; flag limited samples rather
+        # than silently presenting high scores as well-established signals.
+        shortlist["Sample Check"] = shortlist["GP"].apply(
+            lambda gp: "⚠️ <10 GP" if pd.notna(gp) and gp < 10
+            else ("Limited: 10–19 GP" if pd.notna(gp) and gp < 20
+                  else "20+ GP")
+        )
         st.dataframe(
             shortlist[[
                 "Overall Rank", "Player", "Team", "Goal Threat",
                 "Goal Match", "Final Anytime", "Bet Tier",
-                "Lineup Check", "Goalie Check",
+                "Lineup Check", "Goalie Check", "Sample Check",
             ]].style.format({
                 "Goal Threat": "{:.1f}",
                 "Goal Match": "{:.1f}",
