@@ -348,6 +348,13 @@ if games:
                     "positionCode": dressed_player.get("position", ""),
                 })
                 roster_ids.add(pid)
+        # When GameCenter has no dressed lineup, show the roster but flag it
+        # as unconfirmed; never silently discard potential starters.
+        if not dressed_ids:
+            st.caption(
+                f"{team}: dressed lineup not yet published; roster candidates "
+                "are shown as unconfirmed."
+            )
         if not roster_players:
             st.warning(
                 f"{team} is scheduled but roster and GameCenter skaters are unavailable."
@@ -635,14 +642,24 @@ if games:
             f"Full 10-game shot samples (including prior season if needed): {shot_available}/{shot_total} skaters. "
             "Missing values are shown as — and are not treated as zero."
         )
+        if shot_available < shot_total:
+            st.caption(
+                "Missing shot values mean insufficient accessible game history "
+                "or unavailable player logs; they are not zero-shot games."
+            )
         if shot_available == 0:
             st.warning(
                 "Recent shot logs are unavailable for this slate. "
                 "Existing model rankings are unaffected."
             )
 
+        # Normalize missing shot values for clean numeric formatting.
+        for shot_col in ("L5 S/GP", "L10 S/GP", "Shot Trend"):
+            skaters_df[shot_col] = pd.to_numeric(
+                skaters_df[shot_col], errors="coerce"
+            )
         st.dataframe(
-            skaters_df[main_columns].replace({None: float("nan")}).style
+            skaters_df[main_columns].style
             .map(color_goal_threat, subset=["Goal Threat"])
             .map(color_goal_match, subset=["Goal Match"])
             .map(color_goalie_match, subset=["Goalie Match"])
