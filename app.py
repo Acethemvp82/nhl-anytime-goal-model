@@ -729,7 +729,8 @@ if games:
             live_tracker["Player"] = live_tracker["Player"].fillna("Not on current board")
             tracker_columns = [
                 "Player", "Team", "Actual Goals", "Overall Rank", "Team Rank",
-                "Goal Threat", "Goal Match", "Final Anytime", "Bet Tier",
+                "Goal Threat", "L5 S/GP", "L10 S/GP", "Shot Trend",
+                "Goal Match", "Final Anytime", "Bet Tier",
                 "Goalie Match", "Model Match"
             ]
             st.dataframe(
@@ -788,7 +789,8 @@ if games:
             )["Actual Goals"].sum()
             model_columns = [
                 "Player_ID", "Team", "Player", "Overall Rank", "Team Rank",
-                "Goal Threat", "Goal Match", "Final Anytime", "Bet Tier",
+                "Goal Threat", "L5 S/GP", "L10 S/GP", "Shot Trend",
+                "Goal Match", "Final Anytime", "Bet Tier",
                 "Goalie Match", "Lineup Status",
             ]
             tracker_df = actual_df.merge(
@@ -813,8 +815,9 @@ if games:
             st.dataframe(
                 tracker_df[[
                     "Player", "Team", "Actual Goals", "Team Rank",
-                    "Overall Rank", "Goal Threat", "Goal Match",
-                    "Final Anytime", "Bet Tier", "Goalie Match", "Model Match",
+                    "Overall Rank", "Goal Threat", "L5 S/GP", "L10 S/GP",
+                    "Shot Trend", "Goal Match", "Final Anytime",
+                    "Bet Tier", "Goalie Match", "Model Match",
                 ]],
                 use_container_width=True,
                 hide_index=True,
