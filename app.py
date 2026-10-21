@@ -76,6 +76,34 @@ def get_player_stats(player_id):
     return {}
 
 
+@st.cache_data(ttl=3600)
+def get_recent_shots(player_id, season_id, before_date):
+    """Return pregame L5/L10 shot averages, or None when unavailable."""
+    url = f"https://api-web.nhle.com/v1/player/{player_id}/game-log/{season_id}/2"
+    try:
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
+        payload = response.json()
+        logs = payload.get("gameLog", [])
+        eligible = [
+            row for row in logs
+            if str(row.get("gameDate", "")) < str(before_date)
+            and row.get("shots") is not None
+        ]
+        eligible.sort(key=lambda row: str(row.get("gameDate", "")), reverse=True)
+        if not eligible:
+            return None
+        shots = [float(row["shots"]) for row in eligible[:10]]
+        l5 = shots[:5]
+        return {
+            "L5 S/GP": round(sum(l5) / len(l5), 2),
+            "L10 S/GP": round(sum(shots) / len(shots), 2),
+            "Shot Trend": round(sum(l5) / len(l5) - sum(shots) / len(shots), 2),
+        }
+    except (requests.RequestException, ValueError, TypeError, KeyError):
+        return None
+
+
 @st.cache_data(ttl=1800)
 def get_team_stats(team):
     url = f"https://api.nhle.com/stats/rest/en/team/summary?cayenneExp=teamAbbrev=%22{team}%22"
@@ -321,6 +349,13 @@ if games:
                 position = player.get("positionCode", "")
                 player_id = player.get("id")
                 player_stats = get_player_stats(player_id)
+                # Exclude today's games to avoid post-puck-drop data leakage.
+                season_start = int(selected_date[:4])
+                if int(selected_date[5:7]) < 7:
+                    season_start -= 1
+                season_id = f"{season_start}{season_start + 1}"
+                recent_shots = get_recent_shots(player_id, season_id, selected_date) or {}
+
                 # GameCenter entries may omit firstName/lastName, but include
                 # name.default; player landing also supplies fullName.
                 def readable_name(value):
@@ -451,6 +486,9 @@ if games:
                     "G/GP": goals_per_game,
                     "Shots": shots,
                     "S/GP": shots_per_game,
+                    "L5 S/GP": recent_shots.get("L5 S/GP"),
+                    "L10 S/GP": recent_shots.get("L10 S/GP"),
+                    "Shot Trend": recent_shots.get("Shot Trend"),
                     "Player_ID": player_id
                 })          
            
@@ -569,12 +607,12 @@ if games:
                 skaters_df[col] = skaters_df[col].round(1)
         main_columns = [
             "Overall Rank", "Team Rank", "Player", "Team", "Game Time",
-            "Goal Threat", "Goal Match", "Goalie Match", "Final Anytime",
+            "Goal Threat", "L5 S/GP", "L10 S/GP", "Shot Trend", "Goal Match", "Goalie Match", "Final Anytime",
             "Bet Tier", "Opp Goalie", "Lineup Status",
         ]
         advanced_columns = [
             "Overall Rank", "Team Rank", "Player", "Team", "Opponent",
-            "Game Time", "Goals", "GP", "G/GP", "Shots", "S/GP",
+            "Game Time", "Goals", "GP", "G/GP", "Shots", "S/GP", "L5 S/GP", "L10 S/GP", "Shot Trend",
             "Opp GA/GP", "Position", "Player_ID", "Goalie Status",
             "Goal Threat", "Goal Match", "Goalie Match", "Final Anytime",
             "Bet Tier", "Opp Goalie", "Lineup Status",
