@@ -293,8 +293,31 @@ if games:
                     dressed_ids.add(player_id)
           
             
-        for position_group in ["forwards", "defensemen"]:
-            for player in roster.get(position_group, []):
+        roster_players = roster.get("forwards", []) + roster.get("defensemen", [])
+        roster_ids = {p.get("id") for p in roster_players}
+        # Supplement an incomplete roster with dressed skaters from GameCenter.
+        for group in ("forwards", "defense"):
+            for dressed_player in team_game_stats.get(group, []):
+                pid = dressed_player.get("playerId")
+                if pid is None or pid in roster_ids:
+                    continue
+                first = dressed_player.get("firstName", {})
+                last = dressed_player.get("lastName", {})
+                first = first.get("default", "") if isinstance(first, dict) else str(first or "")
+                last = last.get("default", "") if isinstance(last, dict) else str(last or "")
+                roster_players.append({
+                    "id": pid,
+                    "firstName": {"default": first},
+                    "lastName": {"default": last},
+                    "positionCode": dressed_player.get("position", ""),
+                })
+                roster_ids.add(pid)
+        if not roster_players:
+            st.warning(
+                f"{team} is scheduled but roster and GameCenter skaters are unavailable."
+            )
+
+        for player in roster_players:
                 first_name = player.get("firstName", {}).get("default", "")
                 last_name = player.get("lastName", {}).get("default", "")
                 position = player.get("positionCode", "")
