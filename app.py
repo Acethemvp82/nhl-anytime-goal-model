@@ -136,24 +136,48 @@ def get_team_stats(team):
     return {}
 
 @st.cache_data(ttl=1800)
-def get_goalie_stats(player_id):
-    current_season = "20262027"
-
-    url = (
-"https://api.nhle.com/stats/rest/en/goalie/summary"
-    f"?cayenneExp=seasonId={current_season}%20and%20playerId={player_id}"
-)
+def get_goalie_stats(player_id, season_id):
+    """NHL goalie summary for one player/season, or an empty result."""
+    url = "https://api.nhle.com/stats/rest/en/goalie/summary"
+    params = {
+        "cayenneExp": f"seasonId={season_id} and playerId={player_id} and gameTypeId=2",
+        "limit": 100,
+    }
     try:
-        response = requests.get(url, timeout=15)
+        response = requests.get(url, params=params, timeout=15)
         response.raise_for_status()
-        data = response.json()
-
-        goalies = data.get("data", [])
-
-        return data
-
-    except requests.RequestException:
+        return response.json()
+    except (requests.RequestException, ValueError):
         return {"data": []}
+
+
+def goalie_season_numbers(player_id, selected_date):
+    """Use current-season stats, then previous season if unavailable."""
+    season_start = int(selected_date[:4]) - (int(selected_date[5:7]) < 7)
+    for start in (season_start, season_start - 1):
+        season = int(f"{start}{start + 1}")
+        rows = get_goalie_stats(player_id, season).get("data", [])
+        if not rows:
+            continue
+        row = rows[0]
+        games = int(row.get("gamesPlayed") or 0)
+        save_pct = row.get("savePct")
+        if games <= 0 or save_pct is None:
+            continue
+        save_pct = float(save_pct)
+        # NHL stats may encode SV% as 0.900 or 90.0.
+        if save_pct > 1:
+            save_pct /= 100
+        if not 0.5 <= save_pct <= 1:
+            continue
+        return {
+            "SV%": save_pct,
+            "GAA": float(row.get("goalsAgainstAverage") or 0),
+            "GP": games,
+            "Source": "Current season SV%" if start == season_start else "Prior season SV%",
+        }
+    return None
+
 games = []
 try:
     schedule_data = get_nhl_schedule()
@@ -244,63 +268,55 @@ if games:
             game_data_map[team] = get_game_data(game_id)
         else:
             game_data_map[team] = {}     
-    # Goalie matchup data from GameCenter
+    # GameCenter starters take priority. Before lineups appear, select the
+    # most-used roster goalie as an explicitly UNCONFIRMED proxy.
     goalie_map = {}
-
     for team in slate_teams:
         goalie_map[team] = {
-            "Goalie": "Unknown",
-            "Player_ID": None,
-            "SV%": 0,
-            "GAA": 0,
-            "Status": "Unknown"
+            "Goalie": "Unknown", "Player_ID": None, "SV%": 0,
+            "GAA": 0, "Status": "Unknown", "Source": "Neutral fallback (no SV%)"
         }
-
         game_data = game_data_map.get(team, {})
-        player_stats = game_data.get("playerByGameStats", {})
+        by_game = game_data.get("playerByGameStats") or {}
+        side = "awayTeam" if team == game_data.get("awayTeam", {}).get("abbrev") else "homeTeam"
+        game_goalies = by_game.get(side, {}).get("goalies", [])
+        starter = next((g for g in game_goalies if g.get("starter") is True), None)
+        if starter:
+            candidates = [starter]
+            status = "GameCenter starter"
+        elif game_goalies:
+            candidates = game_goalies
+            status = "GameCenter listed (unconfirmed)"
+        else:
+            roster = get_team_roster(team)
+            candidates = roster.get("goalies", [])
+            status = "Roster proxy (unconfirmed)"
 
-        if player_stats:
-            away_team = game_data.get("awayTeam", {}).get("abbrev", "")
-            side = "awayTeam" if team == away_team else "homeTeam"
-            team_game_stats = player_stats.get(side, {})
-            goalies = team_game_stats.get("goalies", [])
-
-            if goalies:
-                # GameCenter often lists goalies before it flags a starter.
-                # Display the first listed goalie as UNCONFIRMED, never as confirmed.
-                goalie = next((g for g in goalies if g.get("starter") is True), None)
-                goalie_status = "Confirmed" if goalie else "Listed (unconfirmed)"
-                if goalie is None:
-                    goalie = goalies[0]
-                goalie_id = goalie.get("playerId")
-                goalie_stats = get_goalie_stats(goalie_id) if goalie_id else {"data": []}
-                
-                stats_rows = goalie_stats.get("data", [])
-
-                if stats_rows:
-                    season_goalie = stats_rows[0]
-                    goalie_sv = season_goalie.get("savePct", 0) or 0
-                    goalie_gaa = season_goalie.get("goalsAgainstAverage", 0) or 0
-                else:
-                    goalie_sv = 0
-                    goalie_gaa = 0
-
-                goalie_name = goalie.get("name", {})
-                if isinstance(goalie_name, dict):
-                    goalie_name = goalie_name.get("default", "")
-                if not goalie_name:
-                    first = goalie.get("firstName", {})
-                    last = goalie.get("lastName", {})
-                    first = first.get("default", "") if isinstance(first, dict) else first
-                    last = last.get("default", "") if isinstance(last, dict) else last
-                    goalie_name = f"{first} {last}".strip()
-                goalie_map[team] = {
-                    "Goalie": goalie_name or "Unknown",
-                    "Player_ID": goalie_id,
-                    "SV%": goalie_sv,
-                    "GAA": goalie_gaa,
-                    "Status": goalie_status
-                }
+        evaluated = []
+        for goalie in candidates:
+            goalie_id = goalie.get("playerId") or goalie.get("id")
+            if not goalie_id:
+                continue
+            stats = goalie_season_numbers(goalie_id, selected_date)
+            if stats:
+                evaluated.append((stats["GP"], goalie, goalie_id, stats))
+        if not evaluated:
+            continue
+        # Choose the goalie with the largest relevant-season sample, never
+        # call a roster proxy a confirmed starter.
+        _, goalie, goalie_id, stats = max(evaluated, key=lambda item: item[0])
+        name = goalie.get("name", {})
+        name = name.get("default", "") if isinstance(name, dict) else str(name or "")
+        if not name:
+            first, last = goalie.get("firstName", {}), goalie.get("lastName", {})
+            first = first.get("default", "") if isinstance(first, dict) else str(first or "")
+            last = last.get("default", "") if isinstance(last, dict) else str(last or "")
+            name = f"{first} {last}".strip()
+        goalie_map[team] = {
+            "Goalie": name or "Unknown", "Player_ID": goalie_id,
+            "SV%": stats["SV%"], "GAA": stats["GAA"],
+            "Status": status, "Source": stats["Source"],
+        }
     skaters = []      
 
     for team in slate_teams:
@@ -495,7 +511,7 @@ if games:
                     "Goalie Match": goalie_match,
                     "Opp Goalie": opp_goalie_name,
                     "Goalie Status": opp_goalie.get("Status", "Unknown"),
-                    "Goalie Data": "Season SV%" if goalie_sv > 0 else "Neutral fallback (no SV%)",
+                    "Goalie Data": opp_goalie.get("Source", "Neutral fallback (no SV%)"),
                     "Lineup Status": "Dressed (GameCenter)" if dressed_ids else "Roster Candidate",
                     "Position": position,
                     "GP": games_played,
@@ -653,7 +669,7 @@ if games:
         )
         shortlist["Goalie Check"] = shortlist["Goalie Data"].apply(
             lambda source: "⚠️ Neutral fallback"
-            if source != "Season SV%" else "Season SV% available"
+            if source.startswith("Neutral fallback") else source
         )
         # Early-season rates can be unstable; flag limited samples rather
         # than silently presenting high scores as well-established signals.
