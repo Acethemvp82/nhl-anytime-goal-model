@@ -495,6 +495,7 @@ if games:
                     "Goalie Match": goalie_match,
                     "Opp Goalie": opp_goalie_name,
                     "Goalie Status": opp_goalie.get("Status", "Unknown"),
+                    "Goalie Data": "Season SV%" if goalie_sv > 0 else "Neutral fallback (no SV%)",
                     "Lineup Status": "Dressed (GameCenter)" if dressed_ids else "Roster Candidate",
                     "Position": position,
                     "GP": games_played,
@@ -630,12 +631,12 @@ if games:
         main_columns = [
             "Overall Rank", "Team Rank", "Player", "Team", "Game Time",
             "Goal Threat", "L5 S/GP", "L10 S/GP", "Shot Trend", "Goal Match", "Goalie Match", "Final Anytime",
-            "Bet Tier", "Opp Goalie", "Lineup Status",
+            "Bet Tier", "Opp Goalie", "Goalie Data", "Lineup Status",
         ]
         advanced_columns = [
             "Overall Rank", "Team Rank", "Player", "Team", "Opponent",
             "Game Time", "Goals", "GP", "G/GP", "Shots", "S/GP", "L5 S/GP", "L10 S/GP", "Shot Trend", "Shot Games",
-            "Opp GA/GP", "Position", "Player_ID", "Goalie Status",
+            "Opp GA/GP", "Position", "Player_ID", "Goalie Status", "Goalie Data",
             "Goal Threat", "Goal Match", "Goalie Match", "Final Anytime",
             "Bet Tier", "Opp Goalie", "Lineup Status",
         ]
