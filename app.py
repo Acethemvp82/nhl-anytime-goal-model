@@ -78,35 +78,38 @@ def get_player_stats(player_id):
 
 @st.cache_data(ttl=3600)
 def get_recent_shots(player_id, season_id, before_date):
-    """Return pregame L5/L10 shot averages, or None when unavailable."""
-    url = f"https://api-web.nhle.com/v1/player/{player_id}/game-log/{season_id}/2"
-    try:
-        response = requests.get(url, timeout=10)
-        response.raise_for_status()
-        payload = response.json()
-        logs = payload.get("gameLog", [])
-        eligible = [
-            row for row in logs
-            if str(row.get("gameDate", "")) < str(before_date)
-            and row.get("shots") is not None
-        ]
-        eligible.sort(key=lambda row: str(row.get("gameDate", "")), reverse=True)
-        if not eligible:
-            return None
-        shots = [float(row["shots"]) for row in eligible[:10]]
-        l5 = shots[:5]
-        # Trend requires a full ten-game sample; otherwise avoid misleading comparisons.
-        return {
-            "L5 S/GP": round(sum(l5) / len(l5), 2) if len(l5) == 5 else None,
-            "L10 S/GP": round(sum(shots) / len(shots), 2) if len(shots) == 10 else None,
-            "Shot Trend": (
-                round(sum(l5) / 5 - sum(shots) / 10, 2)
-                if len(shots) == 10 else None
-            ),
-            "Shot Games": len(shots),
-        }
-    except (requests.RequestException, ValueError, TypeError, KeyError):
+    """Use completed regular-season games before the slate, across seasons."""
+    logs = []
+    seasons = [season_id]
+    prior_start = int(season_id[:4]) - 1
+    seasons.append(f"{prior_start}{prior_start + 1}")
+    for season in seasons:
+        url = f"https://api-web.nhle.com/v1/player/{player_id}/game-log/{season}/2"
+        try:
+            response = requests.get(url, timeout=10)
+            response.raise_for_status()
+            payload = response.json()
+            season_logs = payload.get("gameLog", [])
+            logs.extend(
+                row for row in season_logs
+                if str(row.get("gameDate", "")) < str(before_date)
+                and row.get("shots") is not None
+            )
+        except (requests.RequestException, ValueError, TypeError):
+            continue
+        if len(logs) >= 10:
+            break
+    logs.sort(key=lambda row: str(row.get("gameDate", "")), reverse=True)
+    if not logs:
         return None
+    shots = [float(row["shots"]) for row in logs[:10]]
+    l5 = shots[:5]
+    return {
+        "L5 S/GP": round(sum(l5) / 5, 2) if len(l5) == 5 else None,
+        "L10 S/GP": round(sum(shots) / 10, 2) if len(shots) == 10 else None,
+        "Shot Trend": round(sum(l5) / 5 - sum(shots) / 10, 2) if len(shots) == 10 else None,
+        "Shot Games": len(shots),
+    }
 
 
 @st.cache_data(ttl=1800)
@@ -629,7 +632,7 @@ if games:
         shot_available = int(skaters_df["Shot Trend"].notna().sum())
         shot_total = len(skaters_df)
         st.caption(
-            f"Full 10-game shot samples: {shot_available}/{shot_total} skaters. "
+            f"Full 10-game shot samples (including prior season if needed): {shot_available}/{shot_total} skaters. "
             "Missing values are shown as — and are not treated as zero."
         )
         if shot_available == 0:
@@ -655,7 +658,7 @@ if games:
         )
         with st.expander("📈 Shot Opportunity Watch — informational"):
             st.caption(
-                "Shot Trend = L5 shots/game minus L10 shots/game. "
+                "Shot Trend = L5 shots/game minus L10 shots/game (prior season included when needed). "
                 "Positive means higher recent volume, not a guaranteed goal."
             )
             watch = skaters_df.dropna(subset=["Shot Trend"]).copy()
