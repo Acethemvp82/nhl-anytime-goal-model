@@ -662,11 +662,25 @@ if games:
             if watch.empty:
                 st.info("No recent shot trends available yet.")
             else:
+                watch["Shot Signal"] = watch["Shot Trend"].apply(
+                    lambda trend: (
+                        "RISING" if trend >= 1.0 else
+                        "UP" if trend >= 0.4 else
+                        "FALLING" if trend <= -1.0 else
+                        "DOWN" if trend <= -0.4 else
+                        "STEADY"
+                    )
+                )
                 watch = watch.sort_values("Shot Trend", ascending=False)
+                st.caption(
+                    "RISING: +1.0 or more shots/game; UP: +0.4 to +0.99; "
+                    "STEADY: between -0.4 and +0.4; DOWN: -0.4 to -0.99; "
+                    "FALLING: -1.0 or less. Descriptive thresholds only."
+                )
                 st.dataframe(
                     watch[[
                         "Player", "Team", "Team Rank", "L5 S/GP",
-                        "L10 S/GP", "Shot Trend", "Final Anytime", "Bet Tier"
+                        "L10 S/GP", "Shot Trend", "Shot Signal", "Final Anytime", "Bet Tier"
                     ]].head(20),
                     use_container_width=True,
                     hide_index=True,
