@@ -546,6 +546,121 @@ if games:
             use_container_width=True,
             hide_index=True
         )
+        # A CSV snapshot preserves the pregame rankings independently of Streamlit reruns.
+        st.divider()
+        st.subheader("📊 Goal Results / Model Tracking")
+        st.caption("Download a pregame snapshot BEFORE puck drop. Upload that same file after the games finish to score the frozen predictions.")
+        tracking_cols = [
+            "Date", "Game_ID", "Player_ID", "Player", "Team", "Opponent",
+            "Overall Rank", "Team Rank", "Goal Threat", "Goal Match",
+            "Final Anytime", "Bet Tier", "Goalie Match", "Opp Goalie",
+            "Goalie Status", "Lineup Status"
+        ]
+        snapshot_df = skaters_df.copy()
+        snapshot_df["Date"] = selected_date
+        snapshot_df["Game_ID"] = snapshot_df["Team"].map(game_id_map)
+        snapshot_df = snapshot_df[tracking_cols]
+        st.download_button(
+            "💾 Save Pregame Rankings (CSV)",
+            data=snapshot_df.to_csv(index=False).encode("utf-8"),
+            file_name=f"nhl_pregame_{selected_date}.csv",
+            mime="text/csv",
+            help="Save before games start; downloading again later may capture updated rankings.",
+        )
+
+        uploaded_snapshot = st.file_uploader(
+            "Upload a saved pregame rankings CSV to check actual goals",
+            type=["csv"],
+            key="nhl_goal_tracking_upload",
+        )
+        if uploaded_snapshot is not None:
+            try:
+                saved = pd.read_csv(uploaded_snapshot)
+                required = {"Date", "Game_ID", "Player_ID", "Player", "Team",
+                            "Overall Rank", "Team Rank", "Bet Tier", "Goal Threat",
+                            "Goal Match", "Final Anytime", "Goalie Match"}
+                missing = required - set(saved.columns)
+                if missing:
+                    st.error("Snapshot is missing columns: " + ", ".join(sorted(missing)))
+                else:
+                    saved["Game_ID"] = pd.to_numeric(saved["Game_ID"], errors="coerce")
+                    saved["Player_ID"] = pd.to_numeric(saved["Player_ID"], errors="coerce")
+                    if saved["Game_ID"].isna().any() or saved["Player_ID"].isna().any():
+                        st.error("Snapshot contains missing or invalid game/player IDs.")
+                    else:
+                        saved["Game_ID"] = saved["Game_ID"].astype(int)
+                        saved["Player_ID"] = saved["Player_ID"].astype(int)
+                        game_goals = {}
+                        incomplete = []
+                        for gid in saved["Game_ID"].unique():
+                            result = get_game_data(int(gid))
+                            state = str(result.get("gameState", "")).upper()
+                            by_game = result.get("playerByGameStats") or {}
+                            if state not in ("OFF", "FINAL") or not by_game:
+                                incomplete.append(str(gid))
+                                continue
+                            goals_by_id = {}
+                            for side in ("awayTeam", "homeTeam"):
+                                for group in ("forwards", "defense"):
+                                    for skater in by_game.get(side, {}).get(group, []):
+                                        pid = skater.get("playerId")
+                                        if pid is not None:
+                                            goals_by_id[int(pid)] = int(skater.get("goals") or 0)
+                            game_goals[int(gid)] = goals_by_id
+                        if incomplete:
+                            st.warning(
+                                "Results not final for game IDs: " + ", ".join(incomplete)
+                                + ". Only completed games are included below."
+                            )
+                        checked = saved[saved["Game_ID"].isin(game_goals)].copy()
+                        if checked.empty:
+                            st.info("No completed games with available boxscore stats yet.")
+                        else:
+                            checked["Actual Goals"] = checked.apply(
+                                lambda row: game_goals[row["Game_ID"]].get(row["Player_ID"], 0),
+                                axis=1,
+                            )
+                            checked["Scored"] = checked["Actual Goals"] > 0
+                            st.metric("Tracked players", len(checked))
+                            st.metric("Goal scorers in snapshot", int(checked["Scored"].sum()))
+                            top_five = checked[checked["Team Rank"] <= 5]
+                            elite = checked[checked["Bet Tier"].astype(str).str.contains("ELITE", na=False)]
+                            strong = checked[checked["Bet Tier"].astype(str).str.contains("STRONG", na=False)]
+                            st.write(
+                                f"Top-5 hit rate: {top_five['Scored'].mean():.1%} "
+                                f"({int(top_five['Scored'].sum())}/{len(top_five)})"
+                                if len(top_five) else "Top-5 hit rate: N/A"
+                            )
+                            st.write(
+                                f"Elite hit rate: {elite['Scored'].mean():.1%} "
+                                f"({int(elite['Scored'].sum())}/{len(elite)})"
+                                if len(elite) else "Elite hit rate: N/A"
+                            )
+                            st.write(
+                                f"Strong hit rate: {strong['Scored'].mean():.1%} "
+                                f"({int(strong['Scored'].sum())}/{len(strong)})"
+                                if len(strong) else "Strong hit rate: N/A"
+                            )
+                            result_cols = [
+                                "Date", "Player", "Team", "Team Rank", "Overall Rank",
+                                "Goal Threat", "Goal Match", "Final Anytime", "Bet Tier",
+                                "Goalie Match", "Actual Goals", "Scored"
+                            ]
+                            st.dataframe(
+                                checked[result_cols].sort_values(
+                                    ["Actual Goals", "Overall Rank"], ascending=[False, True]
+                                ),
+                                use_container_width=True,
+                                hide_index=True,
+                            )
+                            st.download_button(
+                                "📥 Download Scored Results",
+                                checked.to_csv(index=False).encode("utf-8"),
+                                file_name="nhl_scored_results.csv",
+                                mime="text/csv",
+                            )
+            except (ValueError, KeyError, pd.errors.ParserError) as exc:
+                st.error(f"Could not process the snapshot: {exc}")
     else:
         st.warning("No NHL games found.")
        
