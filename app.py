@@ -95,10 +95,15 @@ def get_recent_shots(player_id, season_id, before_date):
             return None
         shots = [float(row["shots"]) for row in eligible[:10]]
         l5 = shots[:5]
+        # Trend requires a full ten-game sample; otherwise avoid misleading comparisons.
         return {
-            "L5 S/GP": round(sum(l5) / len(l5), 2),
-            "L10 S/GP": round(sum(shots) / len(shots), 2),
-            "Shot Trend": round(sum(l5) / len(l5) - sum(shots) / len(shots), 2),
+            "L5 S/GP": round(sum(l5) / len(l5), 2) if len(l5) == 5 else None,
+            "L10 S/GP": round(sum(shots) / len(shots), 2) if len(shots) == 10 else None,
+            "Shot Trend": (
+                round(sum(l5) / 5 - sum(shots) / 10, 2)
+                if len(shots) == 10 else None
+            ),
+            "Shot Games": len(shots),
         }
     except (requests.RequestException, ValueError, TypeError, KeyError):
         return None
@@ -489,6 +494,7 @@ if games:
                     "L5 S/GP": recent_shots.get("L5 S/GP"),
                     "L10 S/GP": recent_shots.get("L10 S/GP"),
                     "Shot Trend": recent_shots.get("Shot Trend"),
+                    "Shot Games": recent_shots.get("Shot Games", 0),
                     "Player_ID": player_id
                 })          
            
@@ -612,7 +618,7 @@ if games:
         ]
         advanced_columns = [
             "Overall Rank", "Team Rank", "Player", "Team", "Opponent",
-            "Game Time", "Goals", "GP", "G/GP", "Shots", "S/GP", "L5 S/GP", "L10 S/GP", "Shot Trend",
+            "Game Time", "Goals", "GP", "G/GP", "Shots", "S/GP", "L5 S/GP", "L10 S/GP", "Shot Trend", "Shot Games",
             "Opp GA/GP", "Position", "Player_ID", "Goalie Status",
             "Goal Threat", "Goal Match", "Goalie Match", "Final Anytime",
             "Bet Tier", "Opp Goalie", "Lineup Status",
@@ -620,10 +626,10 @@ if games:
         st.subheader("🏒 Today's Goal Board")
         st.caption("Key scoring signals and rankings. Full player details are under Advanced Stats.")
         # Recent-shot feed health is informational and never changes rankings.
-        shot_available = int(skaters_df["L5 S/GP"].notna().sum())
+        shot_available = int(skaters_df["Shot Trend"].notna().sum())
         shot_total = len(skaters_df)
         st.caption(
-            f"Recent shot data: {shot_available}/{shot_total} skaters available. "
+            f"Full 10-game shot samples: {shot_available}/{shot_total} skaters. "
             "Missing values are shown as — and are not treated as zero."
         )
         if shot_available == 0:
