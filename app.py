@@ -567,46 +567,41 @@ if games:
         for col in ["Opp GA/GP", "Goal Threat", "Goal Match", "Goalie Match", "Final Anytime"]:
             if col in skaters_df.columns:
                 skaters_df[col] = skaters_df[col].round(1)
-        display_df = skaters_df.drop(columns=["Opponent"], errors="ignore")
-        cols = list(display_df.columns)
-        cols.remove("Bet Tier")
-        final_idx = cols.index("Final Anytime")
-        cols.insert(final_idx + 1, "Bet Tier")
-        cols.remove("Game Time")
-        team_idx = cols.index("Team")
-        cols.insert(team_idx + 1, "Game Time")
-        display_df = display_df[cols]
-        st.subheader("🏒 Today's Skaters")
+        main_columns = [
+            "Overall Rank", "Team Rank", "Player", "Team", "Game Time",
+            "Goal Threat", "Goal Match", "Goalie Match", "Final Anytime",
+            "Bet Tier", "Opp Goalie", "Lineup Status",
+        ]
+        advanced_columns = [
+            "Overall Rank", "Team Rank", "Player", "Team", "Opponent",
+            "Game Time", "Goals", "GP", "G/GP", "Shots", "S/GP",
+            "Opp GA/GP", "Position", "Player_ID", "Goalie Status",
+            "Goal Threat", "Goal Match", "Goalie Match", "Final Anytime",
+            "Bet Tier", "Opp Goalie", "Lineup Status",
+        ]
+        st.subheader("🏒 Today's Goal Board")
+        st.caption("Key scoring signals and rankings. Full player details are under Advanced Stats.")
         st.dataframe(
-        display_df.style
-          .map(
-              color_goal_threat,
-              subset=["Goal Threat"]
-         )
-         .map(
-             color_goal_match,
-             subset=["Goal Match"]
-         )
-        .map(
-            color_goalie_match,
-            subset=["Goalie Match"]
-        )
-            
-         .map(
-             color_final_anytime,
-             subset=["Final Anytime"]
-         )
-         .format({
-             "Opp GA/GP": "{:.2f}",
-             "Goal Threat": "{:.1f}",
-             "Goal Match": "{:.1f}",
-             "Goalie Match": "{:.1f}",
-             "Final Anytime": "{:.1f}",
-         }),
-            
+            skaters_df[main_columns].style
+            .map(color_goal_threat, subset=["Goal Threat"])
+            .map(color_goal_match, subset=["Goal Match"])
+            .map(color_goalie_match, subset=["Goalie Match"])
+            .map(color_final_anytime, subset=["Final Anytime"])
+            .format({
+                "Goal Threat": "{:.1f}",
+                "Goal Match": "{:.1f}",
+                "Goalie Match": "{:.1f}",
+                "Final Anytime": "{:.1f}",
+            }),
             use_container_width=True,
-            hide_index=True
+            hide_index=True,
         )
+        with st.expander("📊 Advanced Stats — Full Player Data"):
+            st.dataframe(
+                skaters_df[advanced_columns],
+                use_container_width=True,
+                hide_index=True,
+            )
         # Automatic same-day goal tracker, analogous to the MLB HR Tracker.
         st.divider()
         st.subheader("🏒 Live Goal Tracker")
