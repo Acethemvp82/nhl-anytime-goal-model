@@ -495,7 +495,7 @@ if games:
                     "Goalie Match": goalie_match,
                     "Opp Goalie": opp_goalie_name,
                     "Goalie Status": opp_goalie.get("Status", "Unknown"),
-                    "Lineup Status": "GameCenter" if dressed_ids else "Unconfirmed",
+                    "Lineup Status": "Dressed (GameCenter)" if dressed_ids else "Roster Candidate",
                     "Position": position,
                     "GP": games_played,
                     "G/GP": goals_per_game,
@@ -525,15 +525,21 @@ if games:
             skaters_df.groupby("Team")["Lineup Status"].first()
         ).fillna("Missing")
         coverage["Game Time"] = coverage["Team"].map(game_time_map)
-        coverage["Coverage"] = coverage["Skaters"].apply(
-            lambda count: "MISSING" if count == 0 else
-            "18 SKATERS" if count == 18 else "CHECK COUNT"
-        )
+        def lineup_coverage(row):
+            if row["Skaters"] == 0:
+                return "MISSING"
+            if row["Lineup Status"] == "Roster Candidate":
+                return "UNCONFIRMED ROSTER"
+            if row["Skaters"] == 18:
+                return "18 DRESSED"
+            return "VERIFY GAMECENTER COUNT"
+
+        coverage["Coverage"] = coverage.apply(lineup_coverage, axis=1)
         missing = coverage.loc[coverage["Skaters"] == 0, "Team"].tolist()
         if missing:
             st.error("Scheduled teams missing from rankings: " + ", ".join(missing))
         with st.expander("🔎 Slate Coverage / Lineup Audit", expanded=bool(missing)):
-            st.caption("18 skaters is the usual game-day count, not proof of a confirmed lineup.")
+            st.caption("Roster Candidate means the full roster is shown until GameCenter provides dressed skaters. Dressed (GameCenter) means the game feed identifies the skaters; it is not an independently verified lineup announcement.")
             st.dataframe(coverage, hide_index=True, use_container_width=True)
 
 
