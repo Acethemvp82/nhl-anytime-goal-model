@@ -619,6 +619,19 @@ if games:
         ]
         st.subheader("🏒 Today's Goal Board")
         st.caption("Key scoring signals and rankings. Full player details are under Advanced Stats.")
+        # Recent-shot feed health is informational and never changes rankings.
+        shot_available = int(skaters_df["L5 S/GP"].notna().sum())
+        shot_total = len(skaters_df)
+        st.caption(
+            f"Recent shot data: {shot_available}/{shot_total} skaters available. "
+            "Missing values are shown as — and are not treated as zero."
+        )
+        if shot_available == 0:
+            st.warning(
+                "Recent shot logs are unavailable for this slate. "
+                "Existing model rankings are unaffected."
+            )
+
         st.dataframe(
             skaters_df[main_columns].style
             .map(color_goal_threat, subset=["Goal Threat"])
@@ -634,6 +647,24 @@ if games:
             use_container_width=True,
             hide_index=True,
         )
+        with st.expander("📈 Shot Opportunity Watch — informational"):
+            st.caption(
+                "Shot Trend = L5 shots/game minus L10 shots/game. "
+                "Positive means higher recent volume, not a guaranteed goal."
+            )
+            watch = skaters_df.dropna(subset=["Shot Trend"]).copy()
+            if watch.empty:
+                st.info("No recent shot trends available yet.")
+            else:
+                watch = watch.sort_values("Shot Trend", ascending=False)
+                st.dataframe(
+                    watch[[
+                        "Player", "Team", "Team Rank", "L5 S/GP",
+                        "L10 S/GP", "Shot Trend", "Final Anytime", "Bet Tier"
+                    ]].head(20),
+                    use_container_width=True,
+                    hide_index=True,
+                )
         with st.expander("📊 Advanced Stats — Full Player Data"):
             st.dataframe(
                 skaters_df[advanced_columns],
