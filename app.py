@@ -631,8 +631,7 @@ if games:
         main_columns = [
             "Overall Rank", "Team Rank", "Player", "Team", "Game Time",
             "Goal Threat", "Goal Match", "Final Anytime", "Bet Tier",
-            "Goalie Match", "L5 S/GP", "L10 S/GP", "Shot Trend",
-            "Opp Goalie", "Goalie Data", "Lineup Status",
+            "Goalie Match", "L5 S/GP", "Shot Trend", "Lineup Status",
         ]
         advanced_columns = [
             "Overall Rank", "Team Rank", "Player", "Team", "Opponent",
@@ -641,8 +640,38 @@ if games:
             "Goal Threat", "Goal Match", "Goalie Match", "Final Anytime",
             "Bet Tier", "Opp Goalie", "Lineup Status",
         ]
+        st.subheader("🎯 Top 5 Goal Scorer Shortlist")
+        st.caption(
+            "Top five players by the existing Final Anytime ranking. "
+            "These are model candidates, not guaranteed scorers or calibrated probabilities."
+        )
+        shortlist = skaters_df.head(5).copy()
+        shortlist["Lineup Check"] = shortlist["Lineup Status"].apply(
+            lambda status: "⚠️ Roster candidate"
+            if status == "Roster Candidate" else "GameCenter dressed"
+        )
+        shortlist["Goalie Check"] = shortlist["Goalie Data"].apply(
+            lambda source: "⚠️ Neutral fallback"
+            if source != "Season SV%" else "Season SV% available"
+        )
+        st.dataframe(
+            shortlist[[
+                "Overall Rank", "Player", "Team", "Goal Threat",
+                "Goal Match", "Final Anytime", "Bet Tier",
+                "Lineup Check", "Goalie Check",
+            ]].style.format({
+                "Goal Threat": "{:.1f}",
+                "Goal Match": "{:.1f}",
+                "Final Anytime": "{:.1f}",
+            }),
+            use_container_width=True,
+            hide_index=True,
+        )
         st.subheader("🏒 Today's Goal Board")
-        st.caption("Key scoring signals and rankings. Full player details are under Advanced Stats.")
+        st.caption(
+            "Rankings and scoring signals first; shot volume and lineup checks next. "
+            "Goalie details and L10 shot averages are under Advanced Stats."
+        )
         # Recent-shot feed health is informational and never changes rankings.
         shot_available = int(skaters_df["Shot Trend"].notna().sum())
         shot_total = len(skaters_df)
@@ -717,6 +746,7 @@ if games:
                     hide_index=True,
                 )
         with st.expander("📊 Advanced Stats — Full Player Data"):
+            st.caption("Includes L10 shots/game, opponent goalie, goalie-data source, and season statistics.")
             st.dataframe(
                 skaters_df[advanced_columns],
                 use_container_width=True,
