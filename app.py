@@ -318,11 +318,29 @@ if games:
             )
 
         for player in roster_players:
-                first_name = player.get("firstName", {}).get("default", "")
-                last_name = player.get("lastName", {}).get("default", "")
                 position = player.get("positionCode", "")
                 player_id = player.get("id")
                 player_stats = get_player_stats(player_id)
+                # GameCenter entries may omit firstName/lastName, but include
+                # name.default; player landing also supplies fullName.
+                def readable_name(value):
+                    if isinstance(value, dict):
+                        return str(value.get("default") or "").strip()
+                    return str(value or "").strip()
+                first_name = readable_name(player.get("firstName"))
+                last_name = readable_name(player.get("lastName"))
+                full_name = f"{first_name} {last_name}".strip()
+                if not full_name:
+                    full_name = readable_name(player.get("name"))
+                if not full_name:
+                    full_name = readable_name(player_stats.get("fullName"))
+                if not full_name:
+                    full_name = (
+                        f"{readable_name(player_stats.get('firstName'))} "
+                        f"{readable_name(player_stats.get('lastName'))}"
+                    ).strip()
+                if not full_name:
+                    full_name = f"Player ID {player_id}"
                
         
                 # Only use dressed skaters when GameCenter provides them
@@ -415,7 +433,7 @@ if games:
                 )
     
                 skaters.append({
-                    "Player": f"{first_name} {last_name}".strip(),
+                    "Player": full_name.strip(),
                     "Team": team,
                     "Opponent": opponent_map.get(team, "TBD"),
                     "Game Time": game_time_map.get(team, "TBD"),
