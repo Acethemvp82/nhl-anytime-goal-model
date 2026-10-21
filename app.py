@@ -462,6 +462,26 @@ if games:
 
     if skaters:
         skaters_df = pd.DataFrame(skaters)
+        # Audit all scheduled teams before displaying rankings.
+        coverage = pd.DataFrame({"Team": slate_teams})
+        counts = skaters_df.groupby("Team")["Player_ID"].nunique().rename("Skaters")
+        coverage = coverage.join(counts, on="Team")
+        coverage["Skaters"] = coverage["Skaters"].fillna(0).astype(int)
+        coverage["Lineup Status"] = coverage["Team"].map(
+            skaters_df.groupby("Team")["Lineup Status"].first()
+        ).fillna("Missing")
+        coverage["Game Time"] = coverage["Team"].map(game_time_map)
+        coverage["Coverage"] = coverage["Skaters"].apply(
+            lambda count: "MISSING" if count == 0 else
+            "18 SKATERS" if count == 18 else "CHECK COUNT"
+        )
+        missing = coverage.loc[coverage["Skaters"] == 0, "Team"].tolist()
+        if missing:
+            st.error("Scheduled teams missing from rankings: " + ", ".join(missing))
+        with st.expander("🔎 Slate Coverage / Lineup Audit", expanded=bool(missing)):
+            st.caption("18 skaters is the usual game-day count, not proof of a confirmed lineup.")
+            st.dataframe(coverage, hide_index=True, use_container_width=True)
+
 
         # Rank players by the model's strongest scoring signal
         skaters_df = skaters_df.sort_values(
