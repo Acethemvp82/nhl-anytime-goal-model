@@ -546,6 +546,56 @@ if games:
             use_container_width=True,
             hide_index=True
         )
+        # Automatic same-day goal tracker, analogous to the MLB HR Tracker.
+        st.divider()
+        st.subheader("🏒 Live Goal Tracker")
+        st.caption("Automatically matches GameCenter goal scorers with the current model board. Rankings are live, not frozen pregame snapshots.")
+        scored_rows = []
+        game_states = {}
+        for game_id in sorted(set(game_id_map.values())):
+            if not game_id:
+                continue
+            boxscore = get_game_data(game_id)
+            game_states[game_id] = boxscore.get("gameState", "Unknown")
+            by_game = boxscore.get("playerByGameStats") or {}
+            for side in ("awayTeam", "homeTeam"):
+                team_abbrev = boxscore.get(side, {}).get("abbrev", "")
+                for group in ("forwards", "defense"):
+                    for skater in by_game.get(side, {}).get(group, []):
+                        goals_scored = int(skater.get("goals") or 0)
+                        if goals_scored > 0:
+                            scored_rows.append({
+                                "Game_ID": game_id,
+                                "Player_ID": skater.get("playerId"),
+                                "Team": team_abbrev,
+                                "Actual Goals": goals_scored,
+                            })
+        if scored_rows:
+            actual = pd.DataFrame(scored_rows).drop_duplicates(
+                subset=["Game_ID", "Player_ID"]
+            )
+            live_tracker = actual.merge(
+                skaters_df, on=["Player_ID", "Team"], how="left",
+                indicator=True
+            )
+            live_tracker["Model Match"] = live_tracker["_merge"].map({
+                "both": "✅ In Model", "left_only": "❌ Not In Model"
+            }).astype(str)
+            live_tracker["Player"] = live_tracker["Player"].fillna("Not on current board")
+            tracker_columns = [
+                "Player", "Team", "Actual Goals", "Overall Rank", "Team Rank",
+                "Goal Threat", "Goal Match", "Final Anytime", "Bet Tier",
+                "Goalie Match", "Model Match"
+            ]
+            st.dataframe(
+                live_tracker[tracker_columns].sort_values(
+                    ["Actual Goals", "Overall Rank"], ascending=[False, True]
+                ), use_container_width=True, hide_index=True
+            )
+            st.caption("Live results update with GameCenter's 5-minute cache. Scores and rankings may change during games.")
+        else:
+            st.info("No goal scorers available in the selected slate's GameCenter boxscores yet.")
+
         # A CSV snapshot preserves the pregame rankings independently of Streamlit reruns.
         st.divider()
         st.subheader("📊 Goal Results / Model Tracking")
