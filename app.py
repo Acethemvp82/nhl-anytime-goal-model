@@ -488,7 +488,20 @@ if games:
     
                 if goalie_sv > 0:
                     sv_weakness = max(0, min((0.920 - goalie_sv) / 0.050, 1.0))
-                    goalie_match = round(sv_weakness * 100, 1)
+                    raw_goalie_match = sv_weakness * 100
+                    # Shrink uncertain goalie estimates toward neutral (50).
+                    # The goalie is a proxy until GameCenter identifies a starter.
+                    goalie_status = opp_goalie.get("Status", "Unknown")
+                    goalie_source = opp_goalie.get("Source", "")
+                    if goalie_status != "GameCenter starter":
+                        goalie_reliability = 0.35
+                    elif goalie_source == "Prior season SV%":
+                        goalie_reliability = 0.60
+                    else:
+                        goalie_reliability = 1.0
+                    goalie_match = round(
+                        50 + (raw_goalie_match - 50) * goalie_reliability, 1
+                    )
                 else:
                     goalie_match = 50
     
