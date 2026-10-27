@@ -792,6 +792,81 @@ if games:
         research_df["MP PP TOI/GP"] = (
             research_df["MP PP TOI Min"] / mp_gp.where(mp_gp > 0)
         ).round(2)
+        # Experimental comparison uses only independently observed rates.
+        # It is intentionally not a calibrated goal probability.
+        signals = ["MP HD/GP", "MP xG/GP", "MP Attempts/GP",
+                   "MP PP TOI/GP"]
+        valid = mp_gp.ge(5)
+        for signal in signals:
+            valid &= pd.to_numeric(
+                research_df[signal], errors="coerce"
+            ).notna()
+        research_df["Research Eligible"] = valid
+        research_df["Opportunity Score"] = float("nan")
+        research_df["Experimental Score"] = float("nan")
+        if valid.sum() >= 10:
+            # Percentile ranks limit extreme early-season outliers.
+            # Fixed equal weights are provisional and require backtesting.
+            component = pd.concat([
+                research_df.loc[valid, signal].rank(pct=True) * 100
+                for signal in signals
+            ], axis=1)
+            opportunity = component.mean(axis=1)
+            research_df.loc[valid, "Opportunity Score"] = opportunity.round(1)
+            research_df.loc[valid, "Experimental Score"] = (
+                0.80 * research_df.loc[valid, "Final Anytime"] +
+                0.20 * opportunity
+            ).round(1)
+        research_df["Experimental Rank"] = pd.NA
+        research_df["Experimental Team Rank"] = pd.NA
+        eligible_idx = research_df.loc[
+            research_df["Experimental Score"].notna()
+        ].sort_values(
+            ["Experimental Score", "Final Anytime"],
+            ascending=False
+        ).index
+        if len(eligible_idx):
+            research_df.loc[eligible_idx, "Experimental Rank"] = (
+                range(1, len(eligible_idx) + 1)
+            )
+            research_df.loc[eligible_idx, "Experimental Team Rank"] = (
+                research_df.loc[eligible_idx].groupby("Team").cumcount().to_numpy() + 1
+            )
+        with st.expander("🧪 Experimental Rankings — comparison only"):
+            st.caption(
+                "Experimental Score = 80% existing Final Anytime + 20% "
+                "equal-weight percentile average of high-danger attempts, "
+                "xGoals, shot attempts and 5-on-4 TOI per game. "
+                "Minimum five MoneyPuck games and all four signals required. "
+                "Players without coverage are unranked, not assigned zero. "
+                "This is NOT a calibrated probability, proven betting edge, "
+                "or a replacement for existing rankings."
+            )
+            st.caption(
+                f"Research coverage: {int(valid.sum())}/{len(research_df)} "
+                "skaters eligible. Seasonal MoneyPuck data can contain "
+                "future information for historical selected dates; "
+                "do not use this comparison as a historical backtest."
+            )
+            if not len(eligible_idx):
+                st.warning("Insufficient research data for experimental rankings.")
+            else:
+                st.dataframe(
+                    research_df.loc[eligible_idx, [
+                        "Experimental Rank", "Experimental Team Rank",
+                        "Player", "Team", "Opponent", "Team Rank",
+                        "Final Anytime", "Opportunity Score",
+                        "Experimental Score", "MP HD/GP", "MP xG/GP",
+                        "MP PP TOI/GP",
+                    ]].head(100),
+                    hide_index=True, use_container_width=True,
+                )
+                st.caption(
+                    "Compare Experimental Team Rank with original Team Rank. "
+                    "Actual goal outcomes must be tested using strictly "
+                    "pregame snapshots before any model weight changes."
+                )
+
         with st.expander("🧪 Scoring Opportunity Research — no ranking changes"):
             st.caption(
                 "Recent goals use the same pre-slate NHL game logs as recent shots. "
