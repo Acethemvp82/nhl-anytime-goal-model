@@ -165,6 +165,25 @@ def get_chance_research(season_start):
                    if c in data.columns), None)
     if id_col is None or "situation" not in data.columns:
         return pd.DataFrame(), "Missing player ID or situation field"
+    # Power-play deployment comes from 5on4 rows, separate from
+    # all-situations scoring totals. MoneyPuck icetime is in seconds.
+    pp_rows = data[
+        data["situation"].astype(str).str.lower().isin(["5on4", "powerplay"])
+    ].copy()
+    if not pp_rows.empty and "icetime" in pp_rows.columns:
+        pp_rows["Player_ID"] = pd.to_numeric(
+            pp_rows[id_col], errors="coerce"
+        )
+        pp_rows["MP PP TOI Min"] = (
+            pd.to_numeric(pp_rows["icetime"], errors="coerce") / 60
+        )
+        pp_rows = pp_rows.dropna(subset=["Player_ID"])
+        pp_rows["Player_ID"] = pp_rows["Player_ID"].astype(int)
+        pp_rows = pp_rows.groupby("Player_ID", as_index=False)[
+            "MP PP TOI Min"
+        ].sum()
+    else:
+        pp_rows = pd.DataFrame(columns=["Player_ID", "MP PP TOI Min"])
     data = data[data["situation"].astype(str).str.lower() == "all"].copy()
     if data.empty:
         return pd.DataFrame(), "No all-situations rows"
@@ -186,6 +205,7 @@ def get_chance_research(season_start):
         )
     cols = ["Player_ID"] + list(mapping.values())
     data = data[cols].drop_duplicates("Player_ID")
+    data = data.merge(pp_rows, on="Player_ID", how="left", validate="one_to_one")
     return data, "Season totals (includes games after selected date if viewing history)"
 
 
@@ -755,7 +775,7 @@ if games:
                 chance_data, on="Player_ID", how="left", validate="many_to_one"
             )
         for col in ("MP High Danger", "MP Shot Attempts", "MP xGoals",
-                    "MP Ice Time", "MP GP"):
+                    "MP Ice Time", "MP GP", "MP PP TOI Min"):
             if col not in research_df:
                 research_df[col] = float("nan")
         # Use rates only where the feed supplies an actual game count.
@@ -769,6 +789,9 @@ if games:
         research_df["MP xG/GP"] = (
             research_df["MP xGoals"] / mp_gp.where(mp_gp > 0)
         ).round(3)
+        research_df["MP PP TOI/GP"] = (
+            research_df["MP PP TOI Min"] / mp_gp.where(mp_gp > 0)
+        ).round(2)
         with st.expander("🧪 Scoring Opportunity Research — no ranking changes"):
             st.caption(
                 "Recent goals use the same pre-slate NHL game logs as recent shots. "
@@ -809,17 +832,21 @@ if games:
                 research_df[[
                     "Overall Rank", "Team Rank", "Player", "Team",
                     "MP GP", "MP HD/GP", "MP Attempts/GP", "MP xG/GP",
-                    "Final Anytime",
+                    "MP PP TOI/GP", "Final Anytime",
                 ]].style.format({
                     "MP HD/GP": "{:.2f}",
                     "MP Attempts/GP": "{:.2f}",
                     "MP xG/GP": "{:.3f}",
+                    "MP PP TOI/GP": "{:.2f}",
                 }, na_rep="—"),
                 hide_index=True, use_container_width=True,
             )
             st.caption(
-                "Remaining research: verified power-play TOI and opponent "
-                "defense by position. No changes to the model formula."
+                "Power-play TOI/GP is season 5-on-4 minutes divided by "
+                "season games played, not a recent-game or projected figure. "
+                "Opponent defense by position still requires a verified "
+                "game-level position-attributed feed; no proxy is fabricated. "
+                "No changes to the model formula."
             )
 
         st.subheader("🎯 Top 5 Goal Scorer Shortlist")
