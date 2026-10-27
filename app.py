@@ -103,13 +103,24 @@ def get_recent_shots(player_id, season_id, before_date):
     logs.sort(key=lambda row: str(row.get("gameDate", "")), reverse=True)
     if not logs:
         return None
-    shots = [float(row["shots"]) for row in logs[:10]]
+    sample = logs[:10]
+    shots = [float(row["shots"]) for row in sample]
     l5 = shots[:5]
+    # Goals are a separate research signal. Never treat missing goal
+    # fields as zero or infer them from points.
+    goal_l5 = [float(row["goals"]) for row in sample[:5]
+               if row.get("goals") is not None]
+    goal_l10 = [float(row["goals"]) for row in sample
+                if row.get("goals") is not None]
     return {
         "L5 S/GP": round(sum(l5) / 5, 2) if len(l5) == 5 else None,
         "L10 S/GP": round(sum(shots) / 10, 2) if len(shots) == 10 else None,
         "Shot Trend": round(sum(l5) / 5 - sum(shots) / 10, 2) if len(shots) == 10 else None,
         "Shot Games": len(shots),
+        "L5 Goals": int(sum(goal_l5)) if len(goal_l5) == 5 else None,
+        "L10 Goals": int(sum(goal_l10)) if len(goal_l10) == 10 else None,
+        "L5 G/GP": round(sum(goal_l5) / 5, 2) if len(goal_l5) == 5 else None,
+        "L10 G/GP": round(sum(goal_l10) / 10, 2) if len(goal_l10) == 10 else None,
     }
 
 
@@ -552,6 +563,10 @@ if games:
                     "L10 S/GP": recent_shots.get("L10 S/GP"),
                     "Shot Trend": recent_shots.get("Shot Trend"),
                     "Shot Games": recent_shots.get("Shot Games", 0),
+                    "L5 Goals": recent_shots.get("L5 Goals"),
+                    "L10 Goals": recent_shots.get("L10 Goals"),
+                    "L5 G/GP": recent_shots.get("L5 G/GP"),
+                    "L10 G/GP": recent_shots.get("L10 G/GP"),
                     "Player_ID": player_id
                 })          
            
@@ -683,26 +698,30 @@ if games:
             "Overall Rank", "Team Rank", "Player", "Team", "Opponent",
             "Game Time", "Goals", "GP", "G/GP", "Shots", "S/GP", "L5 S/GP", "L10 S/GP", "Shot Trend", "Shot Games",
             "Opp GA/GP", "Position", "Player_ID", "Goalie Status", "Goalie Data",
+            "L5 Goals", "L10 Goals", "L5 G/GP", "L10 G/GP",
             "PP Goals", "PP Points", "PP G/GP", "PP P/GP",
             "Goal Threat", "Goal Match", "Goalie Match", "Final Anytime",
             "Bet Tier", "Opp Goalie", "Lineup Status",
         ]
         with st.expander("🧪 Scoring Opportunity Research — no ranking changes"):
             st.caption(
-                "Power-play goals and points are retrieved from NHL player season "
-                "statistics where available. These are production measures, NOT "
+                "Recent goals use the same pre-slate NHL game logs as recent shots. "
+                "Power-play goals and points come from NHL player season statistics "
+                "where available. These are production measures, NOT "
                 "power-play ice time or high-danger chance counts. Missing data "
                 "remains blank. No research metric affects Goal Threat, Goal "
                 "Match, Final Anytime, Bet Tier, or Team Rank."
             )
             research_cols = [
                 "Overall Rank", "Team Rank", "Player", "Team", "GP",
-                "S/GP", "L5 S/GP", "PP Goals", "PP Points",
+                "S/GP", "L5 S/GP", "L5 Goals", "L10 Goals",
+                "L5 G/GP", "L10 G/GP", "PP Goals", "PP Points",
                 "PP G/GP", "PP P/GP", "Final Anytime",
             ]
             st.dataframe(
                 skaters_df[research_cols].style.format({
                     "S/GP": "{:.2f}", "L5 S/GP": "{:.2f}",
+                    "L5 G/GP": "{:.2f}", "L10 G/GP": "{:.2f}",
                     "PP G/GP": "{:.3f}", "PP P/GP": "{:.3f}",
                     "Final Anytime": "{:.1f}",
                 }, na_rep="—"),
