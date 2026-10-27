@@ -1112,11 +1112,81 @@ if games:
                             "Team Rank", "Final Anytime", "Def Games",
                             "Pos Shots/GP", "Pos xGA/GP",
                         ]].style.format({
+                            "Team Rank": "{:.0f}",
+                            "Final Anytime": "{:.1f}",
+                            "Def Games": "{:.0f}",
                             "Pos Shots/GP": "{:.2f}",
                             "Pos xGA/GP": "{:.3f}",
                         }, na_rep="—"),
                         use_container_width=True, hide_index=True,
                     )
+                    # A separate on-demand positional experiment; the
+                    # existing Experimental Score and main board are unchanged.
+                    eligible_pos = (
+                        matchups["Experimental Score"].notna()
+                        & matchups["Pos xGA/GP"].notna()
+                        & matchups["Pos Shots/GP"].notna()
+                        & matchups["Def Games"].ge(5)
+                    )
+                    if eligible_pos.sum() >= 10:
+                        experiment = matchups.loc[eligible_pos].copy()
+                        # Positional rates are group-level context, not
+                        # individual goal probabilities. Rank only complete
+                        # observations within the selected slate.
+                        experiment["Position Matchup Score"] = (
+                            0.70 * experiment["Pos xGA/GP"].rank(pct=True) * 100
+                            + 0.30 * experiment["Pos Shots/GP"].rank(pct=True) * 100
+                        ).round(1)
+                        experiment["Position Adjusted Score"] = (
+                            0.85 * experiment["Experimental Score"]
+                            + 0.15 * experiment["Position Matchup Score"]
+                        ).round(1)
+                        experiment = experiment.sort_values(
+                            ["Position Adjusted Score", "Experimental Score"],
+                            ascending=False,
+                        ).copy()
+                        experiment["Position Overall Rank"] = range(
+                            1, len(experiment) + 1
+                        )
+                        experiment["Position Team Rank"] = (
+                            experiment.groupby("Team").cumcount() + 1
+                        )
+                        st.markdown("**🧪 Position-adjusted experimental rankings**")
+                        st.caption(
+                            "Research only: 85% existing Experimental Score + "
+                            "15% positional matchup percentile (70% opponent "
+                            "position xGA/GP, 30% opponent position shots/GP). "
+                            "Only players with complete data are ranked. "
+                            "This is NOT validated, a goal probability, or "
+                            "a replacement for the original Team Rank."
+                        )
+                        st.dataframe(
+                            experiment[[
+                                "Position Overall Rank", "Position Team Rank",
+                                "Player", "Team", "Opponent", "Team Rank",
+                                "Experimental Score", "Position Matchup Score",
+                                "Position Adjusted Score", "Pos xGA/GP",
+                            ]].head(100).style.format({
+                                "Team Rank": "{:.0f}",
+                                "Experimental Score": "{:.1f}",
+                                "Position Matchup Score": "{:.1f}",
+                                "Position Adjusted Score": "{:.1f}",
+                                "Pos xGA/GP": "{:.3f}",
+                            }, na_rep="—"),
+                            use_container_width=True, hide_index=True,
+                        )
+                        st.caption(
+                            "For a fair performance comparison, collect "
+                            "pregame snapshots and actual goal outcomes. "
+                            "Historical season-level opportunity data may "
+                            "contain future games and must not be backtested "
+                            "as though it were pregame."
+                        )
+                    else:
+                        st.info(
+                            "Insufficient complete coverage for position-adjusted "
+                            "experimental rankings (minimum 10 players)."
+                        )
                     st.caption(
                         "Source: MoneyPuck shot ZIP and skater position lookup. "
                         "Unmatched positions remain blank. Shot counts exclude "
@@ -1142,6 +1212,8 @@ if games:
             st.dataframe(
                 skaters_df[research_cols].style.format({
                     "S/GP": "{:.2f}", "L5 S/GP": "{:.2f}",
+                    "L5 Goals": "{:.0f}", "L10 Goals": "{:.0f}",
+                    "PP Goals": "{:.0f}", "PP Points": "{:.0f}",
                     "L5 G/GP": "{:.2f}", "L10 G/GP": "{:.2f}",
                     "PP G/GP": "{:.3f}", "PP P/GP": "{:.3f}",
                     "Final Anytime": "{:.1f}",
@@ -1166,6 +1238,8 @@ if games:
                     "MP GP", "MP HD/GP", "MP Attempts/GP", "MP xG/GP",
                     "MP PP TOI/GP", "Final Anytime",
                 ]].style.format({
+                    "MP GP": "{:.0f}",
+                    "Final Anytime": "{:.1f}",
                     "MP HD/GP": "{:.2f}",
                     "MP Attempts/GP": "{:.2f}",
                     "MP xG/GP": "{:.3f}",
@@ -1176,8 +1250,8 @@ if games:
             st.caption(
                 "Power-play TOI/GP is season 5-on-4 minutes divided by "
                 "season games played, not a recent-game or projected figure. "
-                "Opponent defense by position still requires a verified "
-                "game-level position-attributed feed; no proxy is fabricated. "
+                "Opponent defense by position is available separately "
+                "on demand in Defense vs Position research. "
                 "No changes to the model formula."
             )
 
