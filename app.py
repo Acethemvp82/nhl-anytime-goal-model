@@ -428,6 +428,18 @@ if games:
                     goals = career_stats.get("goals") or 0
                     shots = career_stats.get("shots") or 0
     
+                # Research-only power-play usage indicators from the same NHL
+                # player landing response. Missing fields stay missing.
+                pp_goals = season_stats.get("powerPlayGoals")
+                pp_points = season_stats.get("powerPlayPoints")
+                pp_goals_per_game = (
+                    round(float(pp_goals) / games_played, 3)
+                    if pp_goals is not None and games_played else None
+                )
+                pp_points_per_game = (
+                    round(float(pp_points) / games_played, 3)
+                    if pp_points is not None and games_played else None
+                )
                 goals_per_game = round(goals / games_played, 3) if games_played else 0
                 shots_per_game = round(shots / games_played, 2) if games_played else 0
                 opponent = opponent_map.get(team, "TBD")
@@ -532,6 +544,10 @@ if games:
                     "G/GP": goals_per_game,
                     "Shots": shots,
                     "S/GP": shots_per_game,
+                    "PP Goals": pp_goals,
+                    "PP Points": pp_points,
+                    "PP G/GP": pp_goals_per_game,
+                    "PP P/GP": pp_points_per_game,
                     "L5 S/GP": recent_shots.get("L5 S/GP"),
                     "L10 S/GP": recent_shots.get("L10 S/GP"),
                     "Shot Trend": recent_shots.get("Shot Trend"),
@@ -667,9 +683,38 @@ if games:
             "Overall Rank", "Team Rank", "Player", "Team", "Opponent",
             "Game Time", "Goals", "GP", "G/GP", "Shots", "S/GP", "L5 S/GP", "L10 S/GP", "Shot Trend", "Shot Games",
             "Opp GA/GP", "Position", "Player_ID", "Goalie Status", "Goalie Data",
+            "PP Goals", "PP Points", "PP G/GP", "PP P/GP",
             "Goal Threat", "Goal Match", "Goalie Match", "Final Anytime",
             "Bet Tier", "Opp Goalie", "Lineup Status",
         ]
+        with st.expander("🧪 Scoring Opportunity Research — no ranking changes"):
+            st.caption(
+                "Power-play goals and points are retrieved from NHL player season "
+                "statistics where available. These are production measures, NOT "
+                "power-play ice time or high-danger chance counts. Missing data "
+                "remains blank. No research metric affects Goal Threat, Goal "
+                "Match, Final Anytime, Bet Tier, or Team Rank."
+            )
+            research_cols = [
+                "Overall Rank", "Team Rank", "Player", "Team", "GP",
+                "S/GP", "L5 S/GP", "PP Goals", "PP Points",
+                "PP G/GP", "PP P/GP", "Final Anytime",
+            ]
+            st.dataframe(
+                skaters_df[research_cols].style.format({
+                    "S/GP": "{:.2f}", "L5 S/GP": "{:.2f}",
+                    "PP G/GP": "{:.3f}", "PP P/GP": "{:.3f}",
+                    "Final Anytime": "{:.1f}",
+                }, na_rep="—"),
+                use_container_width=True, hide_index=True,
+            )
+            st.caption(
+                "Next research feeds to validate: individual high-danger "
+                "chances, shot attempts, true power-play TOI, and opponent "
+                "defense by position. These are NOT inferred from available "
+                "statistics or assigned invented values."
+            )
+
         st.subheader("🎯 Top 5 Goal Scorer Shortlist")
         st.caption(
             "Top five players by the existing Final Anytime ranking. "
