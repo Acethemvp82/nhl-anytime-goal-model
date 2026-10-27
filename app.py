@@ -210,6 +210,35 @@ def get_chance_research(season_start):
 
 
 @st.cache_data(ttl=21600)
+def get_nhl_season_game_dates(season_start, selected_date):
+    """Map NHL game IDs to scheduled local dates using weekly NHL schedules."""
+    from datetime import date, timedelta
+    start = date(int(season_start), 10, 1)
+    end = date.fromisoformat(selected_date)
+    mapping = {}
+    if end < start:
+        return mapping
+    cursor = start
+    while cursor <= end:
+        try:
+            response = requests.get(
+                f"https://api-web.nhle.com/v1/schedule/{cursor.isoformat()}",
+                timeout=15,
+            )
+            response.raise_for_status()
+            for day in response.json().get("gameWeek", []):
+                game_date = str(day.get("date", ""))
+                for game in day.get("games", []):
+                    game_id = game.get("id")
+                    if game_id and game_date:
+                        mapping[str(game_id)] = game_date
+        except (requests.RequestException, ValueError, TypeError):
+            pass
+        cursor += timedelta(days=7)
+    return mapping
+
+
+@st.cache_data(ttl=21600)
 def get_defense_by_position(season_start, selected_date):
     """Pre-slate MoneyPuck shot xG allowed by opponent and shooter position.
 
@@ -268,18 +297,19 @@ def get_defense_by_position(season_start, selected_date):
                 usecols=list(rename),
             ).rename(columns=rename)
             if date_from_game_id:
-                # Only accept an actual YYYYMMDD calendar date.
-                game_ids = shots["Source Game ID"].astype(str).str.strip()
-                date_prefix = game_ids.str.extract(r"^(\\d{8})", expand=False)
-                parsed = pd.to_datetime(
-                    date_prefix, format="%Y%m%d", errors="coerce"
+                # NHL IDs are NOT dates. Resolve each ID using official
+                # NHL schedules; unmapped games are excluded, never guessed.
+                id_to_date = get_nhl_season_game_dates(
+                    season_start, selected_date
                 )
-                if parsed.isna().all():
+                ids = shots["Source Game ID"].astype(str).str.strip()
+                ids = ids.str.replace(r"\\.0$", "", regex=True)
+                shots["gameDate"] = ids.map(id_to_date)
+                if shots["gameDate"].isna().all():
                     return pd.DataFrame(), (
-                        "game_id does not contain YYYYMMDD dates; "
-                        "cannot safely apply pre-slate cutoff"
+                        "No NHL schedule matches for shot game IDs; "
+                        "sample IDs: " + ", ".join(ids.dropna().unique()[:3])
                     )
-                shots["gameDate"] = parsed
         players_response = requests.get(
             "https://moneypuck.com/moneypuck/playerData/"
             f"seasonSummary/{season_start}/regular/skaters.csv",
