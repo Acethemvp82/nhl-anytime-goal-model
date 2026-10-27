@@ -147,6 +147,48 @@ def get_team_stats(team):
 
     return {}
 
+@st.cache_data(ttl=21600)
+def get_chance_research(season_start):
+    """Optional MoneyPuck season-level research, never a scoring input."""
+    from io import BytesIO
+    url = (
+        "https://moneypuck.com/moneypuck/playerData/"
+        f"seasonSummary/{season_start}/regular/skaters.csv"
+    )
+    try:
+        response = requests.get(url, timeout=20)
+        response.raise_for_status()
+        data = pd.read_csv(BytesIO(response.content), low_memory=False)
+    except (requests.RequestException, ValueError, pd.errors.ParserError):
+        return pd.DataFrame(), "Feed unavailable"
+    id_col = next((c for c in ("playerId", "playerID", "player_id")
+                   if c in data.columns), None)
+    if id_col is None or "situation" not in data.columns:
+        return pd.DataFrame(), "Missing player ID or situation field"
+    data = data[data["situation"].astype(str).str.lower() == "all"].copy()
+    if data.empty:
+        return pd.DataFrame(), "No all-situations rows"
+    data["Player_ID"] = pd.to_numeric(data[id_col], errors="coerce")
+    data = data.dropna(subset=["Player_ID"])
+    data["Player_ID"] = data["Player_ID"].astype(int)
+    # These are MoneyPuck's own field names; if absent, leave values blank.
+    mapping = {
+        "I_F_highDangerShots": "MP High Danger",
+        "I_F_shotAttempts": "MP Shot Attempts",
+        "I_F_xGoals": "MP xGoals",
+        "icetime": "MP Ice Time",
+        "games_played": "MP GP",
+    }
+    for source, dest in mapping.items():
+        data[dest] = (
+            pd.to_numeric(data[source], errors="coerce")
+            if source in data.columns else float("nan")
+        )
+    cols = ["Player_ID"] + list(mapping.values())
+    data = data[cols].drop_duplicates("Player_ID")
+    return data, "Season totals (includes games after selected date if viewing history)"
+
+
 @st.cache_data(ttl=1800)
 def get_goalie_stats(player_id, season_id):
     """NHL goalie summary for one player/season, or an empty result."""
@@ -703,6 +745,30 @@ if games:
             "Goal Threat", "Goal Match", "Goalie Match", "Final Anytime",
             "Bet Tier", "Opp Goalie", "Lineup Status",
         ]
+        season_start_research = int(selected_date[:4]) - (
+            int(selected_date[5:7]) < 7
+        )
+        chance_data, chance_status = get_chance_research(season_start_research)
+        research_df = skaters_df.copy()
+        if not chance_data.empty:
+            research_df = research_df.merge(
+                chance_data, on="Player_ID", how="left", validate="many_to_one"
+            )
+        for col in ("MP High Danger", "MP Shot Attempts", "MP xGoals",
+                    "MP Ice Time", "MP GP"):
+            if col not in research_df:
+                research_df[col] = float("nan")
+        # Use rates only where the feed supplies an actual game count.
+        mp_gp = pd.to_numeric(research_df["MP GP"], errors="coerce")
+        research_df["MP HD/GP"] = (
+            research_df["MP High Danger"] / mp_gp.where(mp_gp > 0)
+        ).round(2)
+        research_df["MP Attempts/GP"] = (
+            research_df["MP Shot Attempts"] / mp_gp.where(mp_gp > 0)
+        ).round(2)
+        research_df["MP xG/GP"] = (
+            research_df["MP xGoals"] / mp_gp.where(mp_gp > 0)
+        ).round(3)
         with st.expander("🧪 Scoring Opportunity Research — no ranking changes"):
             st.caption(
                 "Recent goals use the same pre-slate NHL game logs as recent shots. "
@@ -728,10 +794,32 @@ if games:
                 use_container_width=True, hide_index=True,
             )
             st.caption(
-                "Next research feeds to validate: individual high-danger "
-                "chances, shot attempts, true power-play TOI, and opponent "
-                "defense by position. These are NOT inferred from available "
-                "statistics or assigned invented values."
+                "MoneyPuck research feed: " + chance_status +
+                ". Source: moneypuck.com/data.htm (non-commercial research; "
+                "credit MoneyPuck). These season-level figures may include "
+                "games AFTER a historical selected date, so they are never "
+                "used in rankings or pregame backtests."
+            )
+            st.caption(
+                "High-danger attempts, shot attempts and expected goals are "
+                "distinct statistics; they are not guaranteed to use the same "
+                "definitions as Prop Finder. Empty values mean unavailable data."
+            )
+            st.dataframe(
+                research_df[[
+                    "Overall Rank", "Team Rank", "Player", "Team",
+                    "MP GP", "MP HD/GP", "MP Attempts/GP", "MP xG/GP",
+                    "Final Anytime",
+                ]].style.format({
+                    "MP HD/GP": "{:.2f}",
+                    "MP Attempts/GP": "{:.2f}",
+                    "MP xG/GP": "{:.3f}",
+                }, na_rep="—"),
+                hide_index=True, use_container_width=True,
+            )
+            st.caption(
+                "Remaining research: verified power-play TOI and opponent "
+                "defense by position. No changes to the model formula."
             )
 
         st.subheader("🎯 Top 5 Goal Scorer Shortlist")
