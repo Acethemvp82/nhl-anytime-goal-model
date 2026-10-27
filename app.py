@@ -226,14 +226,35 @@ def get_defense_by_position(season_start, selected_date):
                            if n.lower().endswith(".csv")), None)
             if member is None:
                 return pd.DataFrame(), "Shot ZIP has no CSV"
+            # Inspect the actual CSV header before selecting columns.
+            # MoneyPuck exports can vary in capitalization and naming.
+            header = pd.read_csv(archive.open(member), nrows=0).columns.tolist()
+            aliases = {
+                "shooterPlayerId": ["shooterPlayerId", "shooterPlayerID",
+                                    "shooterPlayer_id"],
+                "teamCode": ["teamCode", "team", "shootingTeamCode"],
+                "homeTeamCode": ["homeTeamCode", "homeTeam"],
+                "awayTeamCode": ["awayTeamCode", "awayTeam"],
+                "gameDate": ["gameDate", "game_date"],
+                "shotGoalProbability": ["shotGoalProbability", "xGoal"],
+                "isPlayoffGame": ["isPlayoffGame"],
+            }
+            rename = {}
+            for canonical, candidates in aliases.items():
+                found = next((c for c in candidates if c in header), None)
+                if found is not None:
+                    rename[found] = canonical
+            required = set(aliases) - {"isPlayoffGame"}
+            missing = sorted(required - set(rename.values()))
+            if missing:
+                return pd.DataFrame(), (
+                    "Missing shot fields: " + ", ".join(missing) +
+                    " | Available: " + ", ".join(header[:35])
+                )
             shots = pd.read_csv(
                 archive.open(member), low_memory=False,
-                usecols=lambda c: c in {
-                    "shooterPlayerId", "teamCode", "homeTeamCode",
-                    "awayTeamCode", "gameDate", "shotGoalProbability",
-                    "isPlayoffGame",
-                },
-            )
+                usecols=list(rename),
+            ).rename(columns=rename)
         players_response = requests.get(
             "https://moneypuck.com/moneypuck/playerData/"
             f"seasonSummary/{season_start}/regular/skaters.csv",
@@ -247,7 +268,9 @@ def get_defense_by_position(season_start, selected_date):
     needed = {"shooterPlayerId", "teamCode", "homeTeamCode",
               "awayTeamCode", "gameDate", "shotGoalProbability"}
     if not needed.issubset(shots.columns):
-        return pd.DataFrame(), "Shot data missing required attribution columns"
+        return pd.DataFrame(), "Shot data missing: " + ", ".join(
+            sorted(needed - set(shots.columns))
+        )
     if not {"playerId", "position", "situation"}.issubset(players.columns):
         return pd.DataFrame(), "Player position lookup missing required columns"
     if "isPlayoffGame" in shots.columns:
