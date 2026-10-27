@@ -867,6 +867,24 @@ if games:
                     "pregame snapshots before any model weight changes."
                 )
 
+        with st.expander("🛡️ Defense vs Position — feed diagnostics"):
+            st.caption(
+                "Position-specific defensive weakness must be computed from "
+                "shots and expected goals conceded by opponent, attributed "
+                "to the SHOOTER's C/LW/RW position, with game-date cutoffs. "
+                "Team goals allowed alone cannot establish this."
+            )
+            st.info(
+                "Positional matchup scores are not yet available. "
+                "The current MoneyPuck season-summary feed does not "
+                "identify which opponent and position generated each shot. "
+                "We will not display fabricated positional ranks."
+            )
+            st.caption(
+                "Current verified matchup signal: opponent goals against "
+                "per game (Opp GA/GP). It remains in the original model."
+            )
+
         with st.expander("🧪 Scoring Opportunity Research — no ranking changes"):
             st.caption(
                 "Recent goals use the same pre-slate NHL game logs as recent shots. "
