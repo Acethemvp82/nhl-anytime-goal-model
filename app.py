@@ -209,6 +209,117 @@ def get_chance_research(season_start):
     return data, "Season totals (includes games after selected date if viewing history)"
 
 
+@st.cache_data(ttl=21600)
+def get_defense_by_position(season_start, selected_date):
+    """Pre-slate MoneyPuck shot xG allowed by opponent and shooter position.
+
+    Only publishes results when every required shot and player field exists.
+    """
+    from io import BytesIO
+    from zipfile import ZipFile, BadZipFile
+    base = "https://peter-tanner.com/moneypuck/downloads"
+    try:
+        raw = requests.get(f"{base}/shots_{season_start}.zip", timeout=40)
+        raw.raise_for_status()
+        with ZipFile(BytesIO(raw.content)) as archive:
+            member = next((n for n in archive.namelist()
+                           if n.lower().endswith(".csv")), None)
+            if member is None:
+                return pd.DataFrame(), "Shot ZIP has no CSV"
+            shots = pd.read_csv(
+                archive.open(member), low_memory=False,
+                usecols=lambda c: c in {
+                    "shooterPlayerId", "teamCode", "homeTeamCode",
+                    "awayTeamCode", "gameDate", "shotGoalProbability",
+                    "isPlayoffGame",
+                },
+            )
+        players_response = requests.get(
+            "https://moneypuck.com/moneypuck/playerData/"
+            f"seasonSummary/{season_start}/regular/skaters.csv",
+            timeout=25,
+        )
+        players_response.raise_for_status()
+        players = pd.read_csv(BytesIO(players_response.content), low_memory=False)
+    except (requests.RequestException, ValueError, BadZipFile,
+            pd.errors.ParserError, OSError) as exc:
+        return pd.DataFrame(), f"Source unavailable ({type(exc).__name__})"
+    needed = {"shooterPlayerId", "teamCode", "homeTeamCode",
+              "awayTeamCode", "gameDate", "shotGoalProbability"}
+    if not needed.issubset(shots.columns):
+        return pd.DataFrame(), "Shot data missing required attribution columns"
+    if not {"playerId", "position", "situation"}.issubset(players.columns):
+        return pd.DataFrame(), "Player position lookup missing required columns"
+    if "isPlayoffGame" in shots.columns:
+        shots = shots[
+            pd.to_numeric(shots["isPlayoffGame"], errors="coerce") == 0
+        ]
+    # Explicit date cutoffs prevent future-game leakage.
+    dates = pd.to_datetime(shots["gameDate"], errors="coerce")
+    shots = shots.loc[dates.notna() & (
+        dates < pd.Timestamp(selected_date)
+    )].copy()
+    if shots.empty:
+        return pd.DataFrame(), "No pre-slate shots available"
+    lookup = players[
+        players["situation"].astype(str).str.lower() == "all"
+    ][["playerId", "position"]].copy()
+    lookup["shooterPlayerId"] = pd.to_numeric(
+        lookup["playerId"], errors="coerce"
+    )
+    lookup = lookup.dropna(subset=["shooterPlayerId"]).drop_duplicates(
+        "shooterPlayerId"
+    )
+    shots["shooterPlayerId"] = pd.to_numeric(
+        shots["shooterPlayerId"], errors="coerce"
+    )
+    shots = shots.merge(
+        lookup[["shooterPlayerId", "position"]],
+        on="shooterPlayerId", how="left", validate="many_to_one"
+    )
+    shots["Position"] = shots["position"].astype(str).str.upper().replace({
+        "L": "LW", "R": "RW",
+    })
+    shots = shots[shots["Position"].isin(["C", "LW", "RW"])].copy()
+    # The shot's teamCode identifies the SHOOTING side; the other
+    # team in the fixture is the defense that conceded the attempt.
+    for c in ("teamCode", "homeTeamCode", "awayTeamCode"):
+        shots[c] = shots[c].astype(str).str.upper().str.strip()
+    home_shot = shots["teamCode"] == shots["homeTeamCode"]
+    away_shot = shots["teamCode"] == shots["awayTeamCode"]
+    shots = shots[home_shot | away_shot].copy()
+    if shots.empty:
+        return pd.DataFrame(), "No attributable shot opponents"
+    shots["Opponent"] = shots["awayTeamCode"].where(
+        shots["teamCode"] == shots["homeTeamCode"],
+        shots["homeTeamCode"],
+    )
+    shots["Shot xG"] = pd.to_numeric(
+        shots["shotGoalProbability"], errors="coerce"
+    )
+    shots = shots.dropna(subset=["Shot xG"])
+    # Count actual games represented per defense, not player appearances.
+    # A unique home/away/date fixture is sufficient for one regular season.
+    shots["Fixture"] = (
+        shots["gameDate"].astype(str) + "|" +
+        shots["homeTeamCode"] + "|" + shots["awayTeamCode"]
+    )
+    games = shots.groupby("Opponent")["Fixture"].nunique()
+    grouped = shots.groupby(["Opponent", "Position"]).agg(
+        **{"Pos Shots Against": ("Shot xG", "size"),
+           "Pos xGA": ("Shot xG", "sum")}
+    ).reset_index()
+    grouped["Def Games"] = grouped["Opponent"].map(games)
+    grouped = grouped[grouped["Def Games"] >= 5].copy()
+    grouped["Pos Shots/GP"] = (
+        grouped["Pos Shots Against"] / grouped["Def Games"]
+    ).round(2)
+    grouped["Pos xGA/GP"] = (
+        grouped["Pos xGA"] / grouped["Def Games"]
+    ).round(3)
+    return grouped, "Pre-slate MoneyPuck shots; minimum 5 defensive games"
+
+
 @st.cache_data(ttl=1800)
 def get_goalie_stats(player_id, season_id):
     """NHL goalie summary for one player/season, or an empty result."""
@@ -867,23 +978,49 @@ if games:
                     "pregame snapshots before any model weight changes."
                 )
 
-        with st.expander("🛡️ Defense vs Position — feed diagnostics"):
+        with st.expander("🛡️ Defense vs Position — research only"):
             st.caption(
-                "Position-specific defensive weakness must be computed from "
-                "shots and expected goals conceded by opponent, attributed "
-                "to the SHOOTER's C/LW/RW position, with game-date cutoffs. "
-                "Team goals allowed alone cannot establish this."
+                "Shot-level MoneyPuck xG and unblocked attempts conceded "
+                "to opposing C, LW and RW. Pre-slate date cutoff; "
+                "at least five defensive games required. This is NOT "
+                "a goalscorer probability or a calibrated positional rank."
             )
-            st.info(
-                "Positional matchup scores are not yet available. "
-                "The current MoneyPuck season-summary feed does not "
-                "identify which opponent and position generated each shot. "
-                "We will not display fabricated positional ranks."
-            )
-            st.caption(
-                "Current verified matchup signal: opponent goals against "
-                "per game (Opp GA/GP). It remains in the original model."
-            )
+            if st.button("Load position defense research", key="load_pos_def"):
+                with st.spinner("Loading shot-level position matchups..."):
+                    position_data, position_status = get_defense_by_position(
+                        season_start_research, selected_date
+                    )
+                st.caption("Feed: " + position_status)
+                if position_data.empty:
+                    st.warning(
+                        "No verified positional defense rows available. "
+                        "Original rankings remain unaffected."
+                    )
+                else:
+                    positions = research_df["Position"].astype(str).str.upper().replace({
+                        "L": "LW", "R": "RW",
+                    })
+                    matchups = research_df.assign(Position=positions).merge(
+                        position_data, on=["Opponent", "Position"],
+                        how="left", validate="many_to_one"
+                    )
+                    st.dataframe(
+                        matchups[[
+                            "Player", "Team", "Opponent", "Position",
+                            "Team Rank", "Final Anytime", "Def Games",
+                            "Pos Shots/GP", "Pos xGA/GP",
+                        ]].style.format({
+                            "Pos Shots/GP": "{:.2f}",
+                            "Pos xGA/GP": "{:.3f}",
+                        }, na_rep="—"),
+                        use_container_width=True, hide_index=True,
+                    )
+                    st.caption(
+                        "Source: MoneyPuck shot ZIP and skater position lookup. "
+                        "Unmatched positions remain blank. Shot counts exclude "
+                        "blocked attempts. Research is not yet part of "
+                        "Experimental Score or Final Anytime."
+                    )
 
         with st.expander("🧪 Scoring Opportunity Research — no ranking changes"):
             st.caption(
