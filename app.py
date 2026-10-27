@@ -235,7 +235,7 @@ def get_defense_by_position(season_start, selected_date):
                 "teamCode": ["teamCode", "team", "shootingTeamCode"],
                 "homeTeamCode": ["homeTeamCode", "homeTeam"],
                 "awayTeamCode": ["awayTeamCode", "awayTeam"],
-                "gameDate": ["gameDate", "game_date"],
+                "gameDate": ["gameDate", "game_date", "game_date_utc", "date", "gameDateUTC"],
                 "shotGoalProbability": ["shotGoalProbability", "xGoal"],
                 "isPlayoffGame": ["isPlayoffGame"],
             }
@@ -245,7 +245,19 @@ def get_defense_by_position(season_start, selected_date):
                 if found is not None:
                     rename[found] = canonical
             required = set(aliases) - {"isPlayoffGame"}
-            missing = sorted(required - set(rename.values()))
+            game_id_field = next(
+                (c for c in ("game_id", "gameId", "gameID") if c in header),
+                None,
+            )
+            date_from_game_id = (
+                "gameDate" not in rename.values() and game_id_field is not None
+            )
+            if date_from_game_id:
+                rename[game_id_field] = "Source Game ID"
+            missing = sorted(
+                (required - set(rename.values())) -
+                ({"gameDate"} if date_from_game_id else set())
+            )
             if missing:
                 return pd.DataFrame(), (
                     "Missing shot fields: " + ", ".join(missing) +
@@ -255,6 +267,19 @@ def get_defense_by_position(season_start, selected_date):
                 archive.open(member), low_memory=False,
                 usecols=list(rename),
             ).rename(columns=rename)
+            if date_from_game_id:
+                # Only accept an actual YYYYMMDD calendar date.
+                game_ids = shots["Source Game ID"].astype(str).str.strip()
+                date_prefix = game_ids.str.extract(r"^(\\d{8})", expand=False)
+                parsed = pd.to_datetime(
+                    date_prefix, format="%Y%m%d", errors="coerce"
+                )
+                if parsed.isna().all():
+                    return pd.DataFrame(), (
+                        "game_id does not contain YYYYMMDD dates; "
+                        "cannot safely apply pre-slate cutoff"
+                    )
+                shots["gameDate"] = parsed
         players_response = requests.get(
             "https://moneypuck.com/moneypuck/playerData/"
             f"seasonSummary/{season_start}/regular/skaters.csv",
