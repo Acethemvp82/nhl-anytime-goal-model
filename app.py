@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import requests
+import base64
 import time
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -937,6 +938,126 @@ if games:
         snapshot_df["Date"] = selected_date
         snapshot_df["Game_ID"] = snapshot_df["Team"].map(game_id_map)
         snapshot_df = snapshot_df[tracking_cols]
+        # Persistent pregame snapshots live in GitHub, not Streamlit's ephemeral disk.
+        # Set GITHUB_TOKEN in Streamlit Secrets with repository Contents read/write
+        # access. Once a snapshot exists it is never overwritten by reruns.
+        snapshot_path = f"pregame_snapshots/{selected_date}.csv"
+        snapshot_api = (
+            "https://api.github.com/repos/Acethemvp82/"
+            f"nhl-anytime-goal-model/contents/{snapshot_path}"
+        )
+        github_token = st.secrets.get("GITHUB_TOKEN", "")
+        snapshot_headers = {
+            "Accept": "application/vnd.github+json",
+            "Authorization": f"Bearer {github_token}",
+            "X-GitHub-Api-Version": "2022-11-28",
+        } if github_token else {}
+        stored_snapshot = None
+        snapshot_status = "Manual CSV only (GITHUB_TOKEN not configured)"
+        if github_token:
+            try:
+                existing = requests.get(snapshot_api, headers=snapshot_headers, timeout=12)
+                if existing.status_code == 200:
+                    stored_snapshot = pd.read_csv(
+                        __import__("io").BytesIO(
+                            base64.b64decode(existing.json()["content"])
+                        )
+                    )
+                    snapshot_status = "Saved pregame snapshot loaded"
+                elif existing.status_code == 404:
+                    # Do not save if any scheduled game has already started.
+                    # Schedule statuses are more reliable than device time zones.
+                    pregame_states = {"FUT", "PRE"}
+                    all_pregame = bool(len(daily_schedule)) and all(
+                        str(state).upper() in pregame_states
+                        for state in daily_schedule["Status"]
+                    )
+                    if all_pregame:
+                        payload = {
+                            "message": f"Freeze NHL pregame rankings for {selected_date}",
+                            "content": base64.b64encode(
+                                snapshot_df.to_csv(index=False).encode("utf-8")
+                            ).decode("ascii"),
+                        }
+                        created = requests.put(
+                            snapshot_api, headers=snapshot_headers,
+                            json=payload, timeout=15,
+                        )
+                        if created.status_code == 201:
+                            stored_snapshot = snapshot_df.copy()
+                            snapshot_status = "Pregame snapshot saved automatically"
+                        else:
+                            snapshot_status = (
+                                f"Automatic save unavailable (HTTP {created.status_code})"
+                            )
+                    else:
+                        snapshot_status = "No frozen snapshot: slate already started"
+                else:
+                    snapshot_status = (
+                        f"Snapshot lookup unavailable (HTTP {existing.status_code})"
+                    )
+            except (requests.RequestException, ValueError, KeyError) as exc:
+                snapshot_status = f"Snapshot service unavailable: {type(exc).__name__}"
+        st.caption(f"Automatic tracking: {snapshot_status}. Snapshots are never overwritten.")
+        st.caption(
+            "Automatic saving requires GITHUB_TOKEN in Streamlit Secrets and "
+            "the app to run before the first game starts. Manual CSV remains available."
+        )
+        if stored_snapshot is not None:
+            st.subheader("🎯 Frozen Pregame Performance")
+            try:
+                completed = {}
+                for gid in pd.to_numeric(
+                    stored_snapshot["Game_ID"], errors="coerce"
+                ).dropna().astype(int).unique():
+                    box = get_game_data(int(gid))
+                    if str(box.get("gameState", "")).upper() not in ("OFF", "FINAL"):
+                        continue
+                    by_game = box.get("playerByGameStats") or {}
+                    if not by_game:
+                        continue
+                    goals = {}
+                    for side in ("awayTeam", "homeTeam"):
+                        for group in ("forwards", "defense"):
+                            for p in by_game.get(side, {}).get(group, []):
+                                if p.get("playerId") is not None:
+                                    goals[int(p["playerId"])] = int(p.get("goals") or 0)
+                    completed[int(gid)] = goals
+                frozen = stored_snapshot.copy()
+                frozen["Game_ID"] = pd.to_numeric(frozen["Game_ID"], errors="coerce")
+                frozen["Player_ID"] = pd.to_numeric(frozen["Player_ID"], errors="coerce")
+                frozen = frozen.dropna(subset=["Game_ID", "Player_ID"])
+                frozen = frozen[frozen["Game_ID"].isin(completed)].copy()
+                if frozen.empty:
+                    st.info("Frozen rankings saved; waiting for completed games.")
+                else:
+                    frozen["Actual Goals"] = frozen.apply(
+                        lambda row: completed[int(row["Game_ID"])].get(
+                            int(row["Player_ID"]), 0
+                        ), axis=1
+                    )
+                    frozen["Scored"] = frozen["Actual Goals"] > 0
+                    for label, mask in (
+                        ("Overall Top 5", frozen["Overall Rank"] <= 5),
+                        ("Top 3 per team", frozen["Team Rank"] <= 3),
+                    ):
+                        group = frozen[mask]
+                        if len(group):
+                            st.write(
+                                f"{label}: {int(group['Scored'].sum())}/"
+                                f"{len(group)} scored ({group['Scored'].mean():.1%})"
+                            )
+                    st.dataframe(
+                        frozen[[
+                            "Player", "Team", "Overall Rank", "Team Rank",
+                            "Goal Threat", "Goal Match", "Final Anytime",
+                            "Bet Tier", "Actual Goals", "Scored"
+                        ]].sort_values("Overall Rank"),
+                        use_container_width=True, hide_index=True,
+                    )
+            except (KeyError, ValueError, TypeError) as exc:
+                st.warning(f"Frozen snapshot could not be scored: {exc}")
+
         st.download_button(
             "💾 Save Pregame Rankings (CSV)",
             data=snapshot_df.to_csv(index=False).encode("utf-8"),
