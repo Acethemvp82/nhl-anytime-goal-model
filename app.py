@@ -211,7 +211,7 @@ def get_chance_research(season_start):
 
 @st.cache_data(ttl=21600)
 def get_nhl_season_game_dates(season_start, selected_date):
-    """Map NHL game IDs to scheduled local dates using weekly NHL schedules."""
+    """Map five-digit regular-season IDs to NHL dates and teams."""
     from datetime import date, timedelta
     start = date(int(season_start), 10, 1)
     end = date.fromisoformat(selected_date)
@@ -231,7 +231,14 @@ def get_nhl_season_game_dates(season_start, selected_date):
                 for game in day.get("games", []):
                     game_id = game.get("id")
                     if game_id and game_date:
-                        mapping[str(game_id)] = game_date
+                        # MoneyPuck uses the trailing five digits of NHL
+                        # regular-season game IDs (e.g. 20001).
+                        suffix = str(game_id)[-5:]
+                        mapping[suffix] = {
+                            "date": game_date,
+                            "home": str(game.get("homeTeam", {}).get("abbrev", "")).upper(),
+                            "away": str(game.get("awayTeam", {}).get("abbrev", "")).upper(),
+                        }
         except (requests.RequestException, ValueError, TypeError):
             pass
         cursor += timedelta(days=7)
@@ -302,13 +309,30 @@ def get_defense_by_position(season_start, selected_date):
                 id_to_date = get_nhl_season_game_dates(
                     season_start, selected_date
                 )
-                ids = shots["Source Game ID"].astype(str).str.strip()
-                ids = ids.str.replace(r"\\.0$", "", regex=True)
-                shots["gameDate"] = ids.map(id_to_date)
-                if shots["gameDate"].isna().all():
+                ids = pd.to_numeric(
+                    shots["Source Game ID"], errors="coerce"
+                ).astype("Int64").astype(str)
+                matches = ids.map(id_to_date)
+                shots["gameDate"] = matches.map(
+                    lambda match: match.get("date") if isinstance(match, dict) else None
+                )
+                # Validate both teams against the official schedule. An ID
+                # collision or mismatched season must not yield fake matchups.
+                official_home = matches.map(
+                    lambda match: match.get("home") if isinstance(match, dict) else None
+                )
+                official_away = matches.map(
+                    lambda match: match.get("away") if isinstance(match, dict) else None
+                )
+                valid_teams = (
+                    shots["homeTeamCode"].astype(str).str.upper().eq(official_home)
+                    & shots["awayTeamCode"].astype(str).str.upper().eq(official_away)
+                )
+                shots = shots.loc[valid_teams].copy()
+                if shots.empty:
                     return pd.DataFrame(), (
-                        "No NHL schedule matches for shot game IDs; "
-                        "sample IDs: " + ", ".join(ids.dropna().unique()[:3])
+                        "No game IDs matched official NHL dates AND both teams. "
+                        "Check MoneyPuck season/game ID format."
                     )
         players_response = requests.get(
             "https://moneypuck.com/moneypuck/playerData/"
