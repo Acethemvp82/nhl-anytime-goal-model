@@ -961,11 +961,21 @@ if games:
                 return "PASS"
 
         skaters_df["Bet Tier"] = skaters_df["Final Anytime"].apply(anytime_tier)
+        # Informational only: does not change scores, tiers or ranks.
+        hammer_checks = (
+            (pd.to_numeric(skaters_df["Team Rank"], errors="coerce") <= 3)
+            & (pd.to_numeric(skaters_df["Final Anytime"], errors="coerce") >= 70)
+            & (pd.to_numeric(skaters_df["Goal Match"], errors="coerce") >= 65)
+            & (pd.to_numeric(skaters_df["Goalie Match"], errors="coerce") >= 50)
+            & (pd.to_numeric(skaters_df["L5 S/GP"], errors="coerce") >= 2)
+        )
+        skaters_df["Hammer"] = hammer_checks.map({True: "🔨", False: ""})
+
         for col in ["Opp GA/GP", "Goal Threat", "Goal Match", "Goalie Match", "Final Anytime"]:
             if col in skaters_df.columns:
                 skaters_df[col] = skaters_df[col].round(1)
         main_columns = [
-            "Overall Rank", "Team Rank", "Player", "Team", "Game Time",
+            "Overall Rank", "Team Rank", "Player", "Hammer", "Team", "Game Time",
             "Goal Threat", "Goal Match", "Final Anytime", "Bet Tier",
             "Goalie Match", "L5 S/GP", "Shot Trend", "Lineup Status",
         ]
@@ -1295,6 +1305,7 @@ if games:
             "Rankings and scoring signals first; shot volume and lineup checks next. "
             "Goalie details and L10 shot averages are under Advanced Stats."
         )
+        st.caption("🔨 Hammer: team rank 1–3, Final Anytime ≥70, Goal Match ≥65, Goalie Match ≥50, and L5 shots/game ≥2. Informational only; rankings unchanged.")
         # Recent-shot feed health is informational and never changes rankings.
         shot_available = int(skaters_df["Shot Trend"].notna().sum())
         shot_total = len(skaters_df)
