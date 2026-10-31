@@ -22,21 +22,37 @@ def get_nhl_schedule():
     response = requests.get(url, timeout=15)
     response.raise_for_status()
     return response.json()
-@st.cache_data(ttl=1800)
-def get_team_roster(team):
-    url = f"https://api-web.nhle.com/v1/roster/{team}/current"
+@st.cache_data(ttl=300)
+def get_team_roster(team, season_id=None):
+    """Load a complete roster, falling back to season roster if current is empty.
 
-    for attempt in range(3):
-        response = requests.get(url, timeout=15)
+    Never cache an empty response caused by a transient request failure.
+    """
+    paths = [f"https://api-web.nhle.com/v1/roster/{team}/current"]
+    if season_id:
+        paths.append(f"https://api-web.nhle.com/v1/roster/{team}/{season_id}")
+    last_error = None
+    for url in paths:
+        for attempt in range(3):
+            try:
+                response = requests.get(url, timeout=15)
+                if response.status_code == 429 or response.status_code >= 500:
+                    last_error = f"HTTP {response.status_code}"
+                    time.sleep(2 * (attempt + 1))
+                    continue
+                response.raise_for_status()
+                roster = response.json()
+                if roster.get("forwards") or roster.get("defensemen"):
+                    return roster
+                last_error = "empty roster"
+                break
+            except requests.RequestException as exc:
+                last_error = str(exc)
+                if attempt < 2:
+                    time.sleep(2 * (attempt + 1))
+    # Raising prevents Streamlit from caching an empty roster as valid data.
+    raise RuntimeError(f"{team}: NHL roster unavailable ({last_error})")
 
-        if response.status_code == 429:
-            time.sleep(2 * (attempt + 1))
-            continue
-
-        response.raise_for_status()
-        return response.json()
-
-    return {}
 @st.cache_data(ttl=300)
 def get_game_data(game_id):
     url = f"https://api-web.nhle.com/v1/gamecenter/{game_id}/boxscore"
@@ -604,10 +620,17 @@ if games:
             "SV%": stats["SV%"], "GAA": stats["GAA"],
             "Status": status, "Source": stats["Source"],
         }
+    season_start_roster = int(selected_date[:4]) - (int(selected_date[5:7]) < 7)
+    season_id_roster = f"{season_start_roster}{season_start_roster + 1}"
+    roster_failures = {}
     skaters = []      
 
     for team in slate_teams:
-        roster = get_team_roster(team)
+        try:
+            roster = get_team_roster(team, season_id_roster)
+        except RuntimeError as exc:
+            roster = {}
+            roster_failures[team] = str(exc)
         game_data = game_data_map.get(team, {})
         
         # Get the actual dressed skaters from the GameCenter boxscore
@@ -658,6 +681,8 @@ if games:
                 f"{team}: dressed lineup not yet published; roster candidates "
                 "are shown as unconfirmed."
             )
+        if not roster_players and team in roster_failures:
+            st.error(roster_failures[team] + "; rankings incomplete. Retry after NHL API recovers.")
         if not roster_players:
             st.warning(
                 f"{team} is scheduled but roster and GameCenter skaters are unavailable."
