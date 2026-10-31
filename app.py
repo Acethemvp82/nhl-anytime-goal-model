@@ -961,14 +961,18 @@ if games:
                 return "PASS"
 
         skaters_df["Bet Tier"] = skaters_df["Final Anytime"].apply(anytime_tier)
-        # Informational only: does not change scores, tiers or ranks.
-        hammer_checks = (
-            (pd.to_numeric(skaters_df["Team Rank"], errors="coerce") <= 3)
-            & (pd.to_numeric(skaters_df["Final Anytime"], errors="coerce") >= 70)
-            & (pd.to_numeric(skaters_df["Goal Match"], errors="coerce") >= 65)
-            & (pd.to_numeric(skaters_df["Goalie Match"], errors="coerce") >= 50)
-            & (pd.to_numeric(skaters_df["L5 S/GP"], errors="coerce") >= 2)
-        )
+        # Informational hammer only: scores, tiers and rankings stay unchanged.
+        # Missing shot data does not qualify as a pass.
+        hammer_rules = {
+            "Top 3 team rank": pd.to_numeric(skaters_df["Team Rank"], errors="coerce") <= 3,
+            "Final Anytime >= 65": pd.to_numeric(skaters_df["Final Anytime"], errors="coerce") >= 65,
+            "Goal Match >= 60": pd.to_numeric(skaters_df["Goal Match"], errors="coerce") >= 60,
+            "Goalie Match >= 45": pd.to_numeric(skaters_df["Goalie Match"], errors="coerce") >= 45,
+            "L5 shots/game >= 2": pd.to_numeric(skaters_df["L5 S/GP"], errors="coerce") >= 2,
+        }
+        hammer_checks = pd.Series(True, index=skaters_df.index)
+        for passes_rule in hammer_rules.values():
+            hammer_checks &= passes_rule.fillna(False)
         skaters_df["Hammer"] = hammer_checks.map({True: "🔨", False: ""})
 
         for col in ["Opp GA/GP", "Goal Threat", "Goal Match", "Goalie Match", "Final Anytime"]:
@@ -1305,7 +1309,20 @@ if games:
             "Rankings and scoring signals first; shot volume and lineup checks next. "
             "Goalie details and L10 shot averages are under Advanced Stats."
         )
-        st.caption("🔨 Hammer: team rank 1–3, Final Anytime ≥70, Goal Match ≥65, Goalie Match ≥50, and L5 shots/game ≥2. Informational only; rankings unchanged.")
+        st.caption("🔨 Hammer: team rank 1–3, Final Anytime ≥65, Goal Match ≥60, Goalie Match ≥45, and L5 shots/game ≥2. Informational only; rankings unchanged.")
+        st.caption(f"🔨 Qualified: {int(hammer_checks.sum())} of {len(skaters_df)} skaters")
+        with st.expander("🔨 Hammer Filter Diagnostics"):
+            st.caption("Counts passing each requirement independently. Missing data does not pass a requirement.")
+            st.dataframe(
+                pd.DataFrame({
+                    "Requirement": list(hammer_rules.keys()),
+                    "Players Passing": [int(rule.fillna(False).sum()) for rule in hammer_rules.values()],
+                    "Total Skaters": [len(skaters_df)] * len(hammer_rules),
+                }),
+                hide_index=True,
+                use_container_width=True,
+            )
+
         # Recent-shot feed health is informational and never changes rankings.
         shot_available = int(skaters_df["Shot Trend"].notna().sum())
         shot_total = len(skaters_df)
