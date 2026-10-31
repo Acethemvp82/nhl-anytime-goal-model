@@ -22,35 +22,37 @@ def get_nhl_schedule():
     response = requests.get(url, timeout=15)
     response.raise_for_status()
     return response.json()
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=21600)
 def get_team_roster(team, season_id=None):
-    """Load a complete roster, falling back to season roster if current is empty.
-
-    Never cache an empty response caused by a transient request failure.
-    """
+    """Fetch a roster once per cache window; avoid request storms on 429."""
     paths = [f"https://api-web.nhle.com/v1/roster/{team}/current"]
     if season_id:
         paths.append(f"https://api-web.nhle.com/v1/roster/{team}/{season_id}")
-    last_error = None
+    last_error = "unavailable"
     for url in paths:
-        for attempt in range(3):
+        for attempt in range(2):
             try:
                 response = requests.get(url, timeout=15)
-                if response.status_code == 429 or response.status_code >= 500:
+                if response.status_code == 429:
+                    last_error = "HTTP 429"
+                    # Do not multiply requests while the NHL is rate-limiting.
+                    break
+                if response.status_code >= 500:
                     last_error = f"HTTP {response.status_code}"
-                    time.sleep(2 * (attempt + 1))
-                    continue
+                    if attempt == 0:
+                        time.sleep(3)
+                        continue
+                    break
                 response.raise_for_status()
                 roster = response.json()
                 if roster.get("forwards") or roster.get("defensemen"):
                     return roster
                 last_error = "empty roster"
                 break
-            except requests.RequestException as exc:
+            except (requests.RequestException, ValueError) as exc:
                 last_error = str(exc)
-                if attempt < 2:
-                    time.sleep(2 * (attempt + 1))
-    # Raising prevents Streamlit from caching an empty roster as valid data.
+                if attempt == 0:
+                    time.sleep(3)
     raise RuntimeError(f"{team}: NHL roster unavailable ({last_error})")
 
 @st.cache_data(ttl=300)
