@@ -591,7 +591,13 @@ if games:
             candidates = game_goalies
             status = "GameCenter listed (unconfirmed)"
         else:
-            roster = get_team_roster(team)
+            # A failed roster feed must not crash the entire slate.
+            goalie_season_start = int(selected_date[:4]) - (int(selected_date[5:7]) < 7)
+            goalie_season_id = f"{goalie_season_start}{goalie_season_start + 1}"
+            try:
+                roster = get_team_roster(team, goalie_season_id)
+            except RuntimeError:
+                roster = {}
             candidates = roster.get("goalies", [])
             status = "Roster proxy (unconfirmed)"
 
