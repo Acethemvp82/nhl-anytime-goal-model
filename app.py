@@ -505,6 +505,93 @@ def goalie_season_numbers(player_id, selected_date):
         }
     return None
 
+@st.cache_data(ttl=1800)
+def get_opponent_card_defense(season_id):
+    """One season-specific league request for informational cards only."""
+    try:
+        response = requests.get(
+            "https://api.nhle.com/stats/rest/en/team/summary",
+            params={"cayenneExp": f"seasonId={season_id} and gameTypeId=2", "limit": 100},
+            timeout=15,
+        )
+        response.raise_for_status()
+        rows = response.json().get("data", [])
+        result = {}
+        for row in rows:
+            # Never substitute another season, or use a missing stat as zero.
+            if str(row.get("seasonId")) != str(season_id):
+                continue
+            team_id = row.get("teamId")
+            games = pd.to_numeric(row.get("gamesPlayed"), errors="coerce")
+            goals = pd.to_numeric(row.get("goalsAgainst"), errors="coerce")
+            if team_id is None or pd.isna(games) or games <= 0:
+                continue
+            shots = pd.to_numeric(row.get("shotsAgainstPerGame"), errors="coerce")
+            if pd.isna(shots):
+                total_shots = pd.to_numeric(row.get("shotsAgainst"), errors="coerce")
+                shots = total_shots / games if pd.notna(total_shots) else None
+            result[int(team_id)] = {
+                "GP": int(games),
+                "GA/GP": float(goals / games) if pd.notna(goals) else None,
+                "SA/GP": float(shots) if pd.notna(shots) else None,
+            }
+        return result, "NHL regular-season totals"
+    except (requests.RequestException, ValueError, TypeError, KeyError):
+        return {}, "NHL defensive feed unavailable"
+
+
+def build_opponent_cards(frame, defense, goalies, game_boxes, game_times):
+    """Read existing model ranks without changing them or the input frame."""
+    # Compare goals allowed only; this is descriptive, not a new prediction.
+    eligible = {
+        tid: stats["GA/GP"] for tid, stats in defense.items()
+        if stats.get("GP", 0) >= 5 and pd.notna(stats.get("GA/GP"))
+    }
+    percentiles = pd.Series(eligible, dtype=float).rank(pct=True).to_dict()
+    cards = []
+    for opponent, group in frame.groupby("Opponent", sort=True):
+        box = game_boxes.get(opponent, {})
+        team = next((box.get(side, {}) for side in ("homeTeam", "awayTeam")
+                     if box.get(side, {}).get("abbrev") == opponent), {})
+        stats = defense.get(team.get("id"), {})
+        ga = stats.get("GA/GP")
+        percentile = percentiles.get(team.get("id"))
+        if not stats or pd.isna(ga):
+            exposure = "Defensive data unavailable"
+        elif stats.get("GP", 0) < 5:
+            exposure = "Limited sample"
+        elif len(eligible) < 16 or percentile is None:
+            exposure = "League comparison unavailable"
+        elif percentile >= .75:
+            exposure = "Higher goals allowed"
+        elif percentile >= .25:
+            exposure = "Middle range"
+        else:
+            exposure = "Lower goals allowed"
+        goalie = goalies.get(opponent, {})
+        source = str(goalie.get("Source", "Unavailable"))
+        status = str(goalie.get("Status", "Unknown"))
+        if status == "GameCenter starter":
+            starter_label = "Starter identified by GameCenter"
+        elif status == "Unknown":
+            starter_label = "Starter unknown"
+        else:
+            starter_label = "Unconfirmed — " + status
+        targets = group.sort_values("Overall Rank", kind="stable").head(5).copy()
+        cards.append({
+            "Opponent": str(opponent), "Teams": ", ".join(sorted(group["Team"].unique())),
+            "Time": game_times.get(opponent, "TBD"), "Defense": stats,
+            "Exposure": exposure, "Goalie": goalie.get("Goalie", "Unknown"),
+            "Starter": starter_label, "Goalie Source": source,
+            "SV%": goalie.get("SV%"), "GAA": goalie.get("GAA"),
+            "Targets": targets,
+        })
+    return sorted(cards, key=lambda card: (
+        pd.isna(card["Defense"].get("GA/GP")),
+        -(card["Defense"].get("GA/GP") or 0), card["Opponent"],
+    ))
+
+
 games = []
 try:
     schedule_data = get_nhl_schedule()
@@ -1477,6 +1564,79 @@ if games:
                 use_container_width=True,
                 hide_index=True,
             )
+        st.divider()
+        st.subheader("Opponent Vulnerability & Top Targets")
+        st.caption(
+            "Defensive context plus the top five players facing each opponent, "
+            "in their existing model order. Final Anytime is a model rating, not a probability."
+        )
+        with st.expander("How to read these cards"):
+            st.write(
+                "Higher goals allowed: top quarter of eligible NHL teams in goals conceded per game. "
+                "Middle range: middle half; lower goals allowed: bottom quarter. "
+                "Comparisons require at least 5 games per team and 16 eligible teams league-wide. "
+                "These descriptive labels do not change scores, ranks, tiers or hammer requirements."
+            )
+            st.write(
+                "Defense numbers are regular-season totals as currently reported for the selected season, "
+                "not a last-10 window or a frozen historical snapshot. Historical slate views may include later games. "
+                "Goalie figures use the source shown on each card. A roster proxy is not a confirmed starter."
+            )
+        card_season_start = int(selected_date[:4]) - (int(selected_date[5:7]) < 7)
+        card_season_id = int(f"{card_season_start}{card_season_start + 1}")
+        card_defense, card_feed_status = get_opponent_card_defense(card_season_id)
+        opponent_cards = build_opponent_cards(
+            skaters_df, card_defense, goalie_map, game_data_map, game_time_map
+        )
+        st.caption(
+            f"Defense: {card_season_start}–{str(card_season_start + 1)[-2:]} regular season · "
+            f"{card_feed_status} · Cards sorted by goals allowed per game, highest first"
+        )
+        card_opponent_filter = st.selectbox(
+            "Opponent cards", ["All opponents"] + sorted(card["Opponent"] for card in opponent_cards),
+            key="opponent_research_filter",
+        )
+        for card in opponent_cards:
+            if card_opponent_filter != "All opponents" and card["Opponent"] != card_opponent_filter:
+                continue
+            with st.container(border=True):
+                heading, goalie_heading = st.columns([1, 1])
+                with heading:
+                    st.markdown(f"### Against {card['Opponent']}")
+                    st.write(f"Attacking team: {card['Teams']} · {card['Time']}")
+                    st.write(f"Defensive exposure: **{card['Exposure']}**")
+                with goalie_heading:
+                    st.write(f"Goalie: **{card['Goalie']}**")
+                    st.caption(card["Starter"])
+                    st.caption(f"Goalie stats: {card['Goalie Source']}")
+                stat_ga, stat_sa, stat_sv, stat_gaa = st.columns(4)
+                defense_gp = card["Defense"].get("GP")
+                ga = card["Defense"].get("GA/GP")
+                sa = card["Defense"].get("SA/GP")
+                sv = card["SV%"]
+                gaa = card["GAA"]
+                stat_ga.metric("Goals allowed / game", f"{ga:.2f}" if pd.notna(ga) else "—")
+                stat_sa.metric("Shots allowed / game", f"{sa:.1f}" if pd.notna(sa) else "—")
+                stat_sv.metric("Goalie save %", f"{sv:.3f}" if pd.notna(sv) and sv > 0 else "—")
+                stat_gaa.metric("Goalie GAA", f"{gaa:.2f}" if pd.notna(gaa) and gaa > 0 else "—")
+                st.caption(f"Team sample: {defense_gp} games" if defense_gp else "Team sample unavailable")
+                st.markdown("**Top 5 targets — existing model order**")
+                target_display = card["Targets"][[
+                    "Team Rank", "Overall Rank", "Player", "Hammer", "Team",
+                    "Goal Match", "Final Anytime", "Goalie Match", "L5 S/GP", "Lineup Status",
+                ]].copy()
+                st.dataframe(
+                    target_display.style.map(style_board_score, subset=[
+                        "Goal Match", "Final Anytime", "Goalie Match",
+                    ]).format({
+                        "Team Rank": "{:.0f}", "Overall Rank": "{:.0f}",
+                        "Goal Match": "{:.0f}", "Final Anytime": "{:.0f}",
+                        "Goalie Match": "{:.0f}", "L5 S/GP": "{:.1f}",
+                    }, na_rep="—"),
+                    use_container_width=True, hide_index=True,
+                )
+                if len(target_display) < 5:
+                    st.caption("Fewer than five players are available on the model board for this opponent.")
         # Automatic same-day goal tracker, analogous to the MLB HR Tracker.
         st.divider()
         st.subheader("🏒 Live Goal Tracker")
@@ -1851,4 +2011,5 @@ if games:
        
 
   
+
 
