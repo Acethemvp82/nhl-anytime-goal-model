@@ -1418,15 +1418,7 @@ if games:
         else:
             # Keep native table controls: fullscreen, sorting, search and download.
             # Only the display copy changes; snapshots and model values stay intact.
-            board_display = board_view[[
-                "Overall Rank", "Player", "Team", "Game Time", "Team Rank",
-                "Goal Threat", "Goal Match", "Final Anytime", "Bet Tier",
-                "Goalie Match", "L5 S/GP", "Shot Trend", "Lineup Status",
-            ]].copy()
-            board_display["Player"] = (
-                board_display["Player"].astype(str)
-                + board_view["Hammer"].map(lambda mark: " 🔨" if mark == "🔨" else "")
-            )
+            board_display = board_view[main_columns].copy()
             board_display["Bet Tier"] = board_display["Bet Tier"].map(
                 lambda tier: next((name for name in ("ELITE", "STRONG", "GOOD", "LEAN")
                                    if name in str(tier)), "PASS")
