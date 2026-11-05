@@ -3,6 +3,7 @@ import pandas as pd
 import requests
 import base64
 import time
+from html import escape
 from datetime import datetime
 from zoneinfo import ZoneInfo
 st.set_page_config(
@@ -14,7 +15,78 @@ st.set_page_config(
 st.title("🏒 NHL Anytime Goal Scorer Model")
 st.caption("Goal Threat • Goal Match • Goalie Match • Final Anytime")
 
-st.success("NHL Anytime Goal Model is running.")
+def goal_board_html(frame):
+    """Render a compact display copy; never modify model values or ranks."""
+    columns = [
+        "Overall Rank", "Player", "Team", "Team Rank", "Goal Threat",
+        "Goal Match", "Final Anytime", "Bet Tier", "Goalie Match",
+        "L5 S/GP", "Shot Trend", "Game Time", "Lineup Status",
+    ]
+    labels = {"Overall Rank": "Rank", "Team Rank": "Team #"}
+    styles = """<style>
+    .goal-board-wrap {overflow:auto; max-height:660px; border:1px solid #263148;
+        border-radius:12px; background:#0b1020; color:#e6edf7;}
+    .goal-board {border-collapse:separate; border-spacing:0; width:100%;
+        font-family:inherit; font-size:13px; white-space:nowrap;}
+    .goal-board th {position:sticky; top:0; z-index:3; background:#152037;
+        color:#aebed5; font-size:11px; letter-spacing:.025em; text-align:right;}
+    .goal-board th,.goal-board td {padding:9px 12px; border-bottom:1px solid #1c263b;}
+    .goal-board td {text-align:right; font-variant-numeric:tabular-nums;}
+    .goal-board td:nth-child(2),.goal-board th:nth-child(2) {text-align:left;
+        position:sticky; left:0; background:#0b1020; z-index:1; min-width:160px;}
+    .goal-board th:nth-child(2) {background:#152037; z-index:4;}
+    .goal-board td:nth-child(3),.goal-board th:nth-child(3),
+    .goal-board td:nth-child(8),.goal-board th:nth-child(8),
+    .goal-board td:last-child,.goal-board th:last-child {text-align:left;}
+    .goal-board tr:nth-child(even) td {background:#0f1729;}
+    .goal-board tr:hover td {background:#1b2940;}
+    .goal-board .player-name {font-weight:600; color:#f1f5fc;}
+    .goal-board .hammer {margin-left:7px;}
+    .goal-board .badge {display:inline-block; padding:3px 8px; border-radius:6px;
+        font-size:10px; font-weight:700; letter-spacing:.04em;}
+    .goal-board .elite {background:#153d38; color:#9de3cb;}
+    .goal-board .strong {background:#18364b; color:#a9d8f5;}
+    .goal-board .good {background:#443b21; color:#ead69a;}
+    .goal-board .lean {background:#412f28; color:#e4b59a;}
+    .goal-board .pass {background:#252f41; color:#b6c0d0;}
+    .goal-board .score-high {color:#9de3cb; font-weight:700;}
+    .goal-board .score-mid {color:#c1daf1; font-weight:600;}
+    .goal-board .score-watch {color:#ead69a;}
+    .goal-board .muted {color:#9aaac0;}
+    </style>"""
+    score_cols = {"Goal Threat", "Goal Match", "Final Anytime", "Goalie Match"}
+    parts = [styles, '<div class="goal-board-wrap" role="region" aria-label="Goal scorer rankings" tabindex="0">',
+             '<table class="goal-board"><thead><tr>']
+    parts.extend(f'<th scope="col">{escape(labels.get(col, col))}</th>' for col in columns)
+    parts.append('</tr></thead><tbody>')
+    for _, row in frame.iterrows():
+        parts.append('<tr>')
+        for col in columns:
+            val = row.get(col)
+            if pd.isna(val):
+                cell = '<span class="muted">—</span>'
+            elif col == "Player":
+                hammer = ('<span class="hammer" title="Meets all existing hammer requirements">🔨</span>'
+                          if row.get("Hammer") == "🔨" else '')
+                cell = f'<span class="player-name">{escape(str(val))}</span>{hammer}'
+            elif col == "Bet Tier":
+                tier = next((t for t in ("ELITE", "STRONG", "GOOD", "LEAN") if t in str(val)), "PASS")
+                cell = f'<span class="badge {tier.lower()}">{tier}</span>'
+            elif col in score_cols:
+                number = float(val)
+                band = "score-high" if number >= 70 else ("score-mid" if number >= 60 else ("score-watch" if number >= 50 else "muted"))
+                cell = f'<span class="{band}">{number:.0f}</span>'
+            elif col in ("Overall Rank", "Team Rank", "L5 S/GP"):
+                cell = f'{float(val):.0f}'
+            elif col == "Shot Trend":
+                cell = f'{float(val):+.0f}'
+            else:
+                cell = escape(str(val))
+            parts.append(f'<td>{cell}</td>')
+        parts.append('</tr>')
+    parts.append('</tbody></table></div>')
+    return ''.join(parts)
+
 
 @st.cache_data(ttl=300)
 def get_nhl_schedule():
@@ -1337,66 +1409,64 @@ if games:
             use_container_width=True,
             hide_index=True,
         )
-        st.subheader("🏒 Today's Goal Board")
-        st.caption(
-            "Rankings and scoring signals first; shot volume and lineup checks next. "
-            "Goalie details and L10 shot averages are under Advanced Stats."
-        )
-        st.caption("🔨 Hammer: team rank 1–3, Final Anytime ≥65, Goal Match ≥60, Goalie Match ≥45, and L5 shots/game ≥2. Informational only; rankings unchanged.")
-        st.caption(f"🔨 Qualified: {int(hammer_checks.sum())} of {len(skaters_df)} skaters")
-        with st.expander("🔨 Hammer Filter Diagnostics"):
-            st.caption("Counts passing each requirement independently. Missing data does not pass a requirement.")
-            st.dataframe(
-                pd.DataFrame({
-                    "Requirement": list(hammer_rules.keys()),
-                    "Players Passing": [int(rule.fillna(False).sum()) for rule in hammer_rules.values()],
-                    "Total Skaters": [len(skaters_df)] * len(hammer_rules),
-                }),
-                hide_index=True,
-                use_container_width=True,
-            )
+        st.subheader("Today's Goal Board")
+        st.caption("Goal scorer rankings · Scores are model ratings, not goal probabilities · Scroll sideways for lineup details")
+        filter_team, filter_search, filter_hammer = st.columns([2, 3, 2])
+        with filter_team:
+            board_teams = st.multiselect("Teams", sorted(skaters_df["Team"].unique()), key="goal_board_teams")
+        with filter_search:
+            board_search = st.text_input("Find a player", placeholder="Player name", key="goal_board_search")
+        with filter_hammer:
+            board_hammers = st.checkbox("Hammer qualifiers only", key="goal_board_hammers")
+        board_view = skaters_df.copy()
+        if board_teams:
+            board_view = board_view[board_view["Team"].isin(board_teams)]
+        if board_search.strip():
+            board_view = board_view[board_view["Player"].str.contains(board_search.strip(), case=False, regex=False, na=False)]
+        if board_hammers:
+            board_view = board_view[board_view["Hammer"].eq("🔨")]
+        st.caption(f"Showing {len(board_view)} of {len(skaters_df)} skaters · {int(hammer_checks.sum())} hammer qualifiers · Original slate ranks retained")
+        with st.expander("Board guide and data checks"):
+            st.caption("🔨 Hammer: team rank 1–3, Final Anytime ≥65, Goal Match ≥60, Goalie Match ≥45, and L5 shots/game ≥2. Informational only; rankings unchanged.")
+            with st.expander("🔨 Hammer Filter Diagnostics"):
+                st.caption("Counts passing each requirement independently. Missing data does not pass a requirement.")
+                st.dataframe(
+                    pd.DataFrame({
+                        "Requirement": list(hammer_rules.keys()),
+                        "Players Passing": [int(rule.fillna(False).sum()) for rule in hammer_rules.values()],
+                        "Total Skaters": [len(skaters_df)] * len(hammer_rules),
+                    }),
+                    hide_index=True,
+                    use_container_width=True,
+                )
 
-        # Recent-shot feed health is informational and never changes rankings.
-        shot_available = int(skaters_df["Shot Trend"].notna().sum())
-        shot_total = len(skaters_df)
-        st.caption(
-            f"Full 10-game shot samples (including prior season if needed): {shot_available}/{shot_total} skaters. "
-            "Missing values are shown as — and are not treated as zero."
-        )
-        if shot_available < shot_total:
+            # Recent-shot feed health is informational and never changes rankings.
+            shot_available = int(skaters_df["Shot Trend"].notna().sum())
+            shot_total = len(skaters_df)
             st.caption(
-                "Missing shot values mean insufficient accessible game history "
-                "or unavailable player logs; they are not zero-shot games."
+                f"Full 10-game shot samples (including prior season if needed): {shot_available}/{shot_total} skaters. "
+                "Missing values are shown as — and are not treated as zero."
             )
-        if shot_available == 0:
-            st.warning(
-                "Recent shot logs are unavailable for this slate. "
-                "Existing model rankings are unaffected."
-            )
+            if shot_available < shot_total:
+                st.caption(
+                    "Missing shot values mean insufficient accessible game history "
+                    "or unavailable player logs; they are not zero-shot games."
+                )
+            if shot_available == 0:
+                st.warning(
+                    "Recent shot logs are unavailable for this slate. "
+                    "Existing model rankings are unaffected."
+                )
 
         # Normalize missing shot values for clean numeric formatting.
         for shot_col in ("L5 S/GP", "L10 S/GP", "Shot Trend"):
             skaters_df[shot_col] = pd.to_numeric(
                 skaters_df[shot_col], errors="coerce"
             )
-        st.dataframe(
-            skaters_df[main_columns].style
-            .map(color_goal_threat, subset=["Goal Threat"])
-            .map(color_goal_match, subset=["Goal Match"])
-            .map(color_goalie_match, subset=["Goalie Match"])
-            .map(color_final_anytime, subset=["Final Anytime"])
-            .format({
-                "Goal Threat": "{:.1f}",
-                "L5 S/GP": "{:.0f}",
-                "L10 S/GP": "{:.0f}",
-                "Shot Trend": "{:+.0f}",
-                "Goal Match": "{:.1f}",
-                "Goalie Match": "{:.1f}",
-                "Final Anytime": "{:.1f}",
-            }),
-            use_container_width=True,
-            hide_index=True,
-        )
+        if board_view.empty:
+            st.info("No skaters match these filters. Clear the filters to see the full board.")
+        else:
+            st.markdown(goal_board_html(board_view), unsafe_allow_html=True)
         with st.expander("📈 Shot Opportunity Watch — informational"):
             st.caption(
                 "Shot Trend = L5 shots/game minus L10 shots/game (prior season included when needed). "
@@ -1810,3 +1880,4 @@ if games:
        
 
   
+
