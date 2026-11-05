@@ -1419,9 +1419,9 @@ if games:
             # Keep native table controls: fullscreen, sorting, search and download.
             # Only the display copy changes; snapshots and model values stay intact.
             board_display = board_view[[
-                "Overall Rank", "Player", "Team", "Team Rank", "Goal Threat",
-                "Goal Match", "Final Anytime", "Bet Tier", "Goalie Match",
-                "L5 S/GP", "Shot Trend", "Game Time", "Lineup Status",
+                "Overall Rank", "Player", "Team", "Game Time", "Team Rank",
+                "Goal Threat", "Goal Match", "Final Anytime", "Bet Tier",
+                "Goalie Match", "L5 S/GP", "Shot Trend", "Lineup Status",
             ]].copy()
             board_display["Player"] = (
                 board_display["Player"].astype(str)
