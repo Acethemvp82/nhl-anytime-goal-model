@@ -1435,12 +1435,6 @@ if games:
                     "Final Anytime": "{:.0f}", "Goalie Match": "{:.0f}",
                     "L5 S/GP": "{:.0f}", "Shot Trend": "{:+.0f}",
                 }, na_rep="—"),
-                column_config={
-                    "Overall Rank": st.column_config.NumberColumn("Rank", width="small"),
-                    "Team Rank": st.column_config.NumberColumn("Team #", width="small"),
-                    "Player": st.column_config.TextColumn("Player", width="medium"),
-                },
-                height=660,
                 use_container_width=True,
                 hide_index=True,
             )
