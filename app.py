@@ -3,7 +3,6 @@ import pandas as pd
 import requests
 import base64
 import time
-from html import escape
 from datetime import datetime
 from zoneinfo import ZoneInfo
 st.set_page_config(
@@ -15,77 +14,28 @@ st.set_page_config(
 st.title("🏒 NHL Anytime Goal Scorer Model")
 st.caption("Goal Threat • Goal Match • Goalie Match • Final Anytime")
 
-def goal_board_html(frame):
-    """Render a compact display copy; never modify model values or ranks."""
-    columns = [
-        "Overall Rank", "Player", "Team", "Team Rank", "Goal Threat",
-        "Goal Match", "Final Anytime", "Bet Tier", "Goalie Match",
-        "L5 S/GP", "Shot Trend", "Game Time", "Lineup Status",
-    ]
-    labels = {"Overall Rank": "Rank", "Team Rank": "Team #"}
-    styles = """<style>
-    .goal-board-wrap {overflow:auto; max-height:660px; border:1px solid #263148;
-        border-radius:12px; background:#0b1020; color:#e6edf7;}
-    .goal-board {border-collapse:separate; border-spacing:0; width:100%;
-        font-family:inherit; font-size:13px; white-space:nowrap;}
-    .goal-board th {position:sticky; top:0; z-index:3; background:#152037;
-        color:#aebed5; font-size:11px; letter-spacing:.025em; text-align:right;}
-    .goal-board th,.goal-board td {padding:9px 12px; border-bottom:1px solid #1c263b;}
-    .goal-board td {text-align:right; font-variant-numeric:tabular-nums;}
-    .goal-board td:nth-child(2),.goal-board th:nth-child(2) {text-align:left;
-        position:sticky; left:0; background:#0b1020; z-index:1; min-width:160px;}
-    .goal-board th:nth-child(2) {background:#152037; z-index:4;}
-    .goal-board td:nth-child(3),.goal-board th:nth-child(3),
-    .goal-board td:nth-child(8),.goal-board th:nth-child(8),
-    .goal-board td:last-child,.goal-board th:last-child {text-align:left;}
-    .goal-board tr:nth-child(even) td {background:#0f1729;}
-    .goal-board tr:hover td {background:#1b2940;}
-    .goal-board .player-name {font-weight:600; color:#f1f5fc;}
-    .goal-board .hammer {margin-left:7px;}
-    .goal-board .badge {display:inline-block; padding:3px 8px; border-radius:6px;
-        font-size:10px; font-weight:700; letter-spacing:.04em;}
-    .goal-board .elite {background:#153d38; color:#9de3cb;}
-    .goal-board .strong {background:#18364b; color:#a9d8f5;}
-    .goal-board .good {background:#443b21; color:#ead69a;}
-    .goal-board .lean {background:#412f28; color:#e4b59a;}
-    .goal-board .pass {background:#252f41; color:#b6c0d0;}
-    .goal-board .score-high {color:#9de3cb; font-weight:700;}
-    .goal-board .score-mid {color:#c1daf1; font-weight:600;}
-    .goal-board .score-watch {color:#ead69a;}
-    .goal-board .muted {color:#9aaac0;}
-    </style>"""
-    score_cols = {"Goal Threat", "Goal Match", "Final Anytime", "Goalie Match"}
-    parts = [styles, '<div class="goal-board-wrap" role="region" aria-label="Goal scorer rankings" tabindex="0">',
-             '<table class="goal-board"><thead><tr>']
-    parts.extend(f'<th scope="col">{escape(labels.get(col, col))}</th>' for col in columns)
-    parts.append('</tr></thead><tbody>')
-    for _, row in frame.iterrows():
-        parts.append('<tr>')
-        for col in columns:
-            val = row.get(col)
-            if pd.isna(val):
-                cell = '<span class="muted">—</span>'
-            elif col == "Player":
-                hammer = ('<span class="hammer" title="Meets all existing hammer requirements">🔨</span>'
-                          if row.get("Hammer") == "🔨" else '')
-                cell = f'<span class="player-name">{escape(str(val))}</span>{hammer}'
-            elif col == "Bet Tier":
-                tier = next((t for t in ("ELITE", "STRONG", "GOOD", "LEAN") if t in str(val)), "PASS")
-                cell = f'<span class="badge {tier.lower()}">{tier}</span>'
-            elif col in score_cols:
-                number = float(val)
-                band = "score-high" if number >= 70 else ("score-mid" if number >= 60 else ("score-watch" if number >= 50 else "muted"))
-                cell = f'<span class="{band}">{number:.0f}</span>'
-            elif col in ("Overall Rank", "Team Rank", "L5 S/GP"):
-                cell = f'{float(val):.0f}'
-            elif col == "Shot Trend":
-                cell = f'{float(val):+.0f}'
-            else:
-                cell = escape(str(val))
-            parts.append(f'<td>{cell}</td>')
-        parts.append('</tr>')
-    parts.append('</tbody></table></div>')
-    return ''.join(parts)
+def style_board_score(value):
+    if pd.isna(value):
+        return "color: #94a3b8"
+    if value >= 70:
+        return "background-color: #153d38; color: #9de3cb; font-weight: 600"
+    if value >= 60:
+        return "background-color: #18364b; color: #c1daf1; font-weight: 600"
+    if value >= 50:
+        return "background-color: #443b21; color: #ead69a"
+    return "background-color: #252f41; color: #b6c0d0"
+
+
+def style_board_tier(value):
+    palette = {
+        "ELITE": ("#153d38", "#9de3cb"),
+        "STRONG": ("#18364b", "#a9d8f5"),
+        "GOOD": ("#443b21", "#ead69a"),
+        "LEAN": ("#412f28", "#e4b59a"),
+        "PASS": ("#252f41", "#b6c0d0"),
+    }
+    background, color = palette.get(str(value), palette["PASS"])
+    return f"background-color: {background}; color: {color}; font-weight: 600"
 
 
 @st.cache_data(ttl=300)
@@ -1410,7 +1360,7 @@ if games:
             hide_index=True,
         )
         st.subheader("Today's Goal Board")
-        st.caption("Goal scorer rankings · Scores are model ratings, not goal probabilities · Scroll sideways for lineup details")
+        st.caption("Goal scorer rankings · Scores are model ratings, not goal probabilities · Use the table toolbar to expand; click a column heading to sort")
         filter_team, filter_search, filter_hammer = st.columns([2, 3, 2])
         with filter_team:
             board_teams = st.multiselect("Teams", sorted(skaters_df["Team"].unique()), key="goal_board_teams")
@@ -1466,7 +1416,42 @@ if games:
         if board_view.empty:
             st.info("No skaters match these filters. Clear the filters to see the full board.")
         else:
-            st.markdown(goal_board_html(board_view), unsafe_allow_html=True)
+            # Keep native table controls: fullscreen, sorting, search and download.
+            # Only the display copy changes; snapshots and model values stay intact.
+            board_display = board_view[[
+                "Overall Rank", "Player", "Team", "Team Rank", "Goal Threat",
+                "Goal Match", "Final Anytime", "Bet Tier", "Goalie Match",
+                "L5 S/GP", "Shot Trend", "Game Time", "Lineup Status",
+            ]].copy()
+            board_display["Player"] = (
+                board_display["Player"].astype(str)
+                + board_view["Hammer"].map(lambda mark: " 🔨" if mark == "🔨" else "")
+            )
+            board_display["Bet Tier"] = board_display["Bet Tier"].map(
+                lambda tier: next((name for name in ("ELITE", "STRONG", "GOOD", "LEAN")
+                                   if name in str(tier)), "PASS")
+            )
+            st.dataframe(
+                board_display.style
+                .map(style_board_score, subset=[
+                    "Goal Threat", "Goal Match", "Final Anytime", "Goalie Match",
+                ])
+                .map(style_board_tier, subset=["Bet Tier"])
+                .format({
+                    "Overall Rank": "{:.0f}", "Team Rank": "{:.0f}",
+                    "Goal Threat": "{:.0f}", "Goal Match": "{:.0f}",
+                    "Final Anytime": "{:.0f}", "Goalie Match": "{:.0f}",
+                    "L5 S/GP": "{:.0f}", "Shot Trend": "{:+.0f}",
+                }, na_rep="—"),
+                column_config={
+                    "Overall Rank": st.column_config.NumberColumn("Rank", width="small"),
+                    "Team Rank": st.column_config.NumberColumn("Team #", width="small"),
+                    "Player": st.column_config.TextColumn("Player", width="medium"),
+                },
+                height=660,
+                use_container_width=True,
+                hide_index=True,
+            )
         with st.expander("📈 Shot Opportunity Watch — informational"):
             st.caption(
                 "Shot Trend = L5 shots/game minus L10 shots/game (prior season included when needed). "
