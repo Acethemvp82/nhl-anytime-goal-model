@@ -1454,92 +1454,115 @@ if games:
             use_container_width=True,
             hide_index=True,
         )
-        st.subheader("Today's Goal Board")
-        st.caption("Goal scorer rankings · Scores are model ratings, not goal probabilities · Use the table toolbar to expand; click a column heading to sort")
-        filter_team, filter_search, filter_hammer = st.columns([2, 3, 2])
-        with filter_team:
-            board_teams = st.multiselect("Teams", sorted(skaters_df["Team"].unique()), key="goal_board_teams")
-        with filter_search:
-            board_search = st.text_input("Find a player", placeholder="Player name", key="goal_board_search")
-        with filter_hammer:
-            board_hammers = st.checkbox("Hammer qualifiers only", key="goal_board_hammers")
-        board_view = skaters_df.copy()
-        if board_teams:
-            board_view = board_view[board_view["Team"].isin(board_teams)]
-        if board_search.strip():
-            board_view = board_view[board_view["Player"].str.contains(board_search.strip(), case=False, regex=False, na=False)]
-        if board_hammers:
-            board_view = board_view[board_view["Hammer"].eq("🔨")]
-        st.caption(f"Showing {len(board_view)} of {len(skaters_df)} skaters · {int(hammer_checks.sum())} hammer qualifiers · Original slate ranks retained")
-        with st.expander("Board guide and data checks"):
-            st.caption("🔨 Hammer: team rank 1–3, Final Anytime ≥65, Goal Match ≥60, Goalie Match ≥45, and L5 shots/game ≥2. Informational only; rankings unchanged.")
-            with st.expander("🔨 Hammer Filter Diagnostics"):
-                st.caption("Counts passing each requirement independently. Missing data does not pass a requirement.")
-                st.dataframe(
-                    pd.DataFrame({
-                        "Requirement": list(hammer_rules.keys()),
-                        "Players Passing": [int(rule.fillna(False).sum()) for rule in hammer_rules.values()],
-                        "Total Skaters": [len(skaters_df)] * len(hammer_rules),
-                    }),
-                    hide_index=True,
-                    use_container_width=True,
-                )
-
-            # Recent-shot feed health is informational and never changes rankings.
-            shot_available = int(skaters_df["Shot Trend"].notna().sum())
-            shot_total = len(skaters_df)
-            st.caption(
-                f"Full 10-game shot samples (including prior season if needed): {shot_available}/{shot_total} skaters. "
-                "Missing values are shown as — and are not treated as zero."
-            )
-            if shot_available < shot_total:
-                st.caption(
-                    "Missing shot values mean insufficient accessible game history "
-                    "or unavailable player logs; they are not zero-shot games."
-                )
-            if shot_available == 0:
-                st.warning(
-                    "Recent shot logs are unavailable for this slate. "
-                    "Existing model rankings are unaffected."
-                )
-
-        # Normalize missing shot values for clean numeric formatting.
-        for shot_col in ("L5 S/GP", "L10 S/GP", "Shot Trend"):
-            skaters_df[shot_col] = pd.to_numeric(
-                skaters_df[shot_col], errors="coerce"
-            )
-        if board_view.empty:
-            st.info("No skaters match these filters. Clear the filters to see the full board.")
-        else:
-            # Keep native table controls: fullscreen, sorting, search and download.
-            # Only the display copy changes; snapshots and model values stay intact.
-            board_display = board_view[main_columns].copy()
-            board_display["Bet Tier"] = board_display["Bet Tier"].map(
-                lambda tier: next((name for name in ("ELITE", "STRONG", "GOOD", "LEAN")
-                                   if name in str(tier)), "PASS")
-            )
-            st.dataframe(
-                board_display.style
-                .map(style_board_navy, subset=[
-                    column for column in board_display.columns
-                    if column not in (
-                        "Goal Threat", "Goal Match", "Final Anytime",
-                        "Goalie Match", "Bet Tier",
+        @st.fragment(run_every="5m")
+        def render_active_goal_board():
+            # Refresh only the visible board. Full slate and snapshots remain untouched.
+            try:
+                fresh_schedule = get_nhl_schedule()
+                latest_states = {
+                    game.get("id"): str(game.get("gameState", "")).upper()
+                    for week in fresh_schedule.get("gameWeek", [])
+                    for game in week.get("games", [])
+                }
+            except (requests.RequestException, ValueError, KeyError):
+                latest_states = {}
+            finished_states = {"OFF", "FINAL", "FINAL_OT", "FINAL_SO"}
+            finished_teams = {
+                team for team, game_id in game_id_map.items()
+                if latest_states.get(game_id, "").upper() in finished_states
+            }
+            st.subheader("Today's Goal Board")
+            st.caption("Goal scorer rankings · Scores are model ratings, not goal probabilities · Use the table toolbar to expand; click a column heading to sort")
+            filter_team, filter_search, filter_hammer = st.columns([2, 3, 2])
+            with filter_team:
+                board_teams = st.multiselect("Teams", sorted(skaters_df["Team"].unique()), key="goal_board_teams")
+            with filter_search:
+                board_search = st.text_input("Find a player", placeholder="Player name", key="goal_board_search")
+            with filter_hammer:
+                board_hammers = st.checkbox("Hammer qualifiers only", key="goal_board_hammers")
+            hide_finished = st.checkbox("Hide finished games", value=True, key="goal_board_hide_finished")
+            board_view = skaters_df.copy()
+            if hide_finished and finished_teams:
+                board_view = board_view[~board_view["Team"].isin(finished_teams)]
+            if board_teams:
+                board_view = board_view[board_view["Team"].isin(board_teams)]
+            if board_search.strip():
+                board_view = board_view[board_view["Player"].str.contains(board_search.strip(), case=False, regex=False, na=False)]
+            if board_hammers:
+                board_view = board_view[board_view["Hammer"].eq("🔨")]
+            if hide_finished and finished_teams:
+                st.caption(f"Hidden {len(finished_teams) // 2} finished games · Uncheck to show them again")
+            st.caption(f"Showing {len(board_view)} of {len(skaters_df)} skaters · {int(hammer_checks.sum())} hammer qualifiers · Original slate ranks retained")
+            with st.expander("Board guide and data checks"):
+                st.caption("🔨 Hammer: team rank 1–3, Final Anytime ≥65, Goal Match ≥60, Goalie Match ≥45, and L5 shots/game ≥2. Informational only; rankings unchanged.")
+                with st.expander("🔨 Hammer Filter Diagnostics"):
+                    st.caption("Counts passing each requirement independently. Missing data does not pass a requirement.")
+                    st.dataframe(
+                        pd.DataFrame({
+                            "Requirement": list(hammer_rules.keys()),
+                            "Players Passing": [int(rule.fillna(False).sum()) for rule in hammer_rules.values()],
+                            "Total Skaters": [len(skaters_df)] * len(hammer_rules),
+                        }),
+                        hide_index=True,
+                        use_container_width=True,
                     )
-                ])
-                .map(style_board_score, subset=[
-                    "Goal Threat", "Goal Match", "Final Anytime", "Goalie Match",
-                ])
-                .map(style_board_tier, subset=["Bet Tier"])
-                .format({
-                    "Overall Rank": "{:.0f}", "Team Rank": "{:.0f}",
-                    "Goal Threat": "{:.0f}", "Goal Match": "{:.0f}",
-                    "Final Anytime": "{:.0f}", "Goalie Match": "{:.0f}",
-                    "L5 S/GP": "{:.0f}", "Shot Trend": "{:+.0f}",
-                }, na_rep="—"),
-                use_container_width=True,
-                hide_index=True,
-            )
+    
+                # Recent-shot feed health is informational and never changes rankings.
+                shot_available = int(skaters_df["Shot Trend"].notna().sum())
+                shot_total = len(skaters_df)
+                st.caption(
+                    f"Full 10-game shot samples (including prior season if needed): {shot_available}/{shot_total} skaters. "
+                    "Missing values are shown as — and are not treated as zero."
+                )
+                if shot_available < shot_total:
+                    st.caption(
+                        "Missing shot values mean insufficient accessible game history "
+                        "or unavailable player logs; they are not zero-shot games."
+                    )
+                if shot_available == 0:
+                    st.warning(
+                        "Recent shot logs are unavailable for this slate. "
+                        "Existing model rankings are unaffected."
+                    )
+    
+            # Normalize missing shot values for clean numeric formatting.
+            for shot_col in ("L5 S/GP", "L10 S/GP", "Shot Trend"):
+                skaters_df[shot_col] = pd.to_numeric(
+                    skaters_df[shot_col], errors="coerce"
+                )
+            if board_view.empty:
+                st.info("No skaters match these filters. Clear the filters to see the full board.")
+            else:
+                # Keep native table controls: fullscreen, sorting, search and download.
+                # Only the display copy changes; snapshots and model values stay intact.
+                board_display = board_view[main_columns].copy()
+                board_display["Bet Tier"] = board_display["Bet Tier"].map(
+                    lambda tier: next((name for name in ("ELITE", "STRONG", "GOOD", "LEAN")
+                                       if name in str(tier)), "PASS")
+                )
+                st.dataframe(
+                    board_display.style
+                    .map(style_board_navy, subset=[
+                        column for column in board_display.columns
+                        if column not in (
+                            "Goal Threat", "Goal Match", "Final Anytime",
+                            "Goalie Match", "Bet Tier",
+                        )
+                    ])
+                    .map(style_board_score, subset=[
+                        "Goal Threat", "Goal Match", "Final Anytime", "Goalie Match",
+                    ])
+                    .map(style_board_tier, subset=["Bet Tier"])
+                    .format({
+                        "Overall Rank": "{:.0f}", "Team Rank": "{:.0f}",
+                        "Goal Threat": "{:.0f}", "Goal Match": "{:.0f}",
+                        "Final Anytime": "{:.0f}", "Goalie Match": "{:.0f}",
+                        "L5 S/GP": "{:.0f}", "Shot Trend": "{:+.0f}",
+                    }, na_rep="—"),
+                    use_container_width=True,
+                    hide_index=True,
+                )
+        render_active_goal_board()
         with st.expander("📈 Shot Opportunity Watch — informational"):
             st.caption(
                 "Shot Trend = L5 shots/game minus L10 shots/game (prior season included when needed). "
