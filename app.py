@@ -19,23 +19,23 @@ def style_board_score(value):
     if pd.isna(value):
         return "color: #94a3b8"
     if value >= 70:
-        return "background-color: #7bdca1; color: #101010; font-weight: bold"
+        return "background-color: #00c853; color: #101010; font-weight: bold"
     if value >= 60:
-        return "background-color: #b4e7a0; color: #101010; font-weight: bold"
+        return "background-color: #76d937; color: #101010; font-weight: bold"
     if value >= 50:
-        return "background-color: #ffe78a; color: #101010; font-weight: bold"
+        return "background-color: #ffd600; color: #101010; font-weight: bold"
     if value >= 40:
-        return "background-color: #ffc48a; color: #101010; font-weight: bold"
-    return "background-color: #f3a0a0; color: #101010; font-weight: bold"
+        return "background-color: #ff9100; color: #101010; font-weight: bold"
+    return "background-color: #e53935; color: white; font-weight: bold"
 
 
 def style_board_tier(value):
     palette = {
-        "ELITE": ("#7bdca1", "#101010"),
-        "STRONG": ("#b4e7a0", "#101010"),
-        "GOOD": ("#ffe78a", "#101010"),
-        "LEAN": ("#ffc48a", "#101010"),
-        "PASS": ("#f3a0a0", "#101010"),
+        "ELITE": ("#00c853", "#101010"),
+        "STRONG": ("#76d937", "#101010"),
+        "GOOD": ("#ffd600", "#101010"),
+        "LEAN": ("#ff9100", "#101010"),
+        "PASS": ("#e53935", "#ffffff"),
     }
     background, color = palette.get(str(value), palette["PASS"])
     return f"background-color: {background}; color: {color}; font-weight: bold"
