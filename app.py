@@ -14,6 +14,11 @@ st.set_page_config(
 st.title("🏒 NHL Anytime Goal Scorer Model")
 st.caption("Goal Threat • Goal Match • Goalie Match • Final Anytime")
 
+def style_board_navy(value):
+    """Midnight navy for non-score cells; keep colored scoring cells intact."""
+    return "background-color: #162338; color: #f1f5fb; font-weight: 500"
+
+
 def style_board_score(value):
     """Classic high-contrast red/orange/yellow/green score bands."""
     if pd.isna(value):
@@ -1515,6 +1520,13 @@ if games:
             )
             st.dataframe(
                 board_display.style
+                .map(style_board_navy, subset=[
+                    column for column in board_display.columns
+                    if column not in (
+                        "Goal Threat", "Goal Match", "Final Anytime",
+                        "Goalie Match", "Bet Tier",
+                    )
+                ])
                 .map(style_board_score, subset=[
                     "Goal Threat", "Goal Match", "Final Anytime", "Goalie Match",
                 ])
