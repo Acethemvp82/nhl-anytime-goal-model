@@ -15,8 +15,8 @@ st.title("🏒 NHL Anytime Goal Scorer Model")
 st.caption("Goal Threat • Goal Match • Goalie Match • Final Anytime")
 
 def style_board_navy(value):
-    """Midnight navy for non-score cells; keep colored scoring cells intact."""
-    return "background-color: #162338; color: #f1f5fb; font-weight: 500"
+    """Black background for non-score cells; keep colored scoring cells intact."""
+    return "background-color: #101010; color: #f1f5fb; font-weight: 500"
 
 
 def style_board_score(value):
