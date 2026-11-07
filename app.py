@@ -15,27 +15,30 @@ st.title("🏒 NHL Anytime Goal Scorer Model")
 st.caption("Goal Threat • Goal Match • Goalie Match • Final Anytime")
 
 def style_board_score(value):
+    """Classic high-contrast red/orange/yellow/green score bands."""
     if pd.isna(value):
         return "color: #94a3b8"
     if value >= 70:
-        return "background-color: #153d38; color: #9de3cb; font-weight: 600"
+        return "background-color: #00c853; color: #101010; font-weight: bold"
     if value >= 60:
-        return "background-color: #18364b; color: #c1daf1; font-weight: 600"
+        return "background-color: #76d937; color: #101010; font-weight: bold"
     if value >= 50:
-        return "background-color: #443b21; color: #ead69a"
-    return "background-color: #252f41; color: #b6c0d0"
+        return "background-color: #ffd600; color: #101010; font-weight: bold"
+    if value >= 40:
+        return "background-color: #ff9100; color: #101010; font-weight: bold"
+    return "background-color: #e53935; color: white; font-weight: bold"
 
 
 def style_board_tier(value):
     palette = {
-        "ELITE": ("#153d38", "#9de3cb"),
-        "STRONG": ("#18364b", "#a9d8f5"),
-        "GOOD": ("#443b21", "#ead69a"),
-        "LEAN": ("#412f28", "#e4b59a"),
-        "PASS": ("#252f41", "#b6c0d0"),
+        "ELITE": ("#00c853", "#101010"),
+        "STRONG": ("#76d937", "#101010"),
+        "GOOD": ("#ffd600", "#101010"),
+        "LEAN": ("#ff9100", "#101010"),
+        "PASS": ("#e53935", "#ffffff"),
     }
     background, color = palette.get(str(value), palette["PASS"])
-    return f"background-color: {background}; color: {color}; font-weight: 600"
+    return f"background-color: {background}; color: {color}; font-weight: bold"
 
 
 @st.cache_data(ttl=300)
