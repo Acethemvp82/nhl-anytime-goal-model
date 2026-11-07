@@ -1536,6 +1536,23 @@ if games:
                 # Keep native table controls: fullscreen, sorting, search and download.
                 # Only the display copy changes; snapshots and model values stay intact.
                 board_display = board_view[main_columns].copy()
+                # Display-only longshot watch: never modify skaters_df, ranks, or Hammer.
+                # A diamond signals a data-based opportunity, not verified betting odds.
+                diamond_checks = (
+                    (pd.to_numeric(board_view["Team Rank"], errors="coerce") >= 6)
+                    & (pd.to_numeric(board_view["Goal Match"], errors="coerce") >= 55)
+                    & (pd.to_numeric(board_view["Goalie Match"], errors="coerce") >= 45)
+                    & (pd.to_numeric(board_view["L5 S/GP"], errors="coerce") >= 2)
+                    & (pd.to_numeric(board_view["Shot Trend"], errors="coerce") > 0)
+                ).fillna(False)
+                board_display.loc[diamond_checks, "Player"] = (
+                    "💎 " + board_display.loc[diamond_checks, "Player"].astype(str)
+                )
+                st.caption(
+                    f"💎 Longshot Watch: {int(diamond_checks.sum())} visible candidates "
+                    "(team rank 6+, Goal Match ≥55, Goalie Match ≥45, "
+                    "L5 shots/game ≥2, rising shot trend). No odds used; rankings unchanged."
+                )
                 board_display["Bet Tier"] = board_display["Bet Tier"].map(
                     lambda tier: next((name for name in ("ELITE", "STRONG", "GOOD", "LEAN")
                                        if name in str(tier)), "PASS")
