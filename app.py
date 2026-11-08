@@ -1733,8 +1733,8 @@ if games:
             live_tracker["Player"] = live_tracker["Player"].fillna("Not on current board")
             tracker_columns = [
                 "Player", "Team", "Actual Goals", "Overall Rank", "Team Rank",
-                "Goal Threat", "L5 S/GP", "L10 S/GP", "Shot Trend",
-                "Goal Match", "Final Anytime", "Bet Tier",
+                "Goal Match", "Goal Threat", "L5 S/GP", "L10 S/GP", "Shot Trend",
+                "Final Anytime", "Bet Tier",
                 "Goalie Match", "Model Match"
             ]
             st.dataframe(
@@ -1819,8 +1819,8 @@ if games:
             st.dataframe(
                 tracker_df[[
                     "Player", "Team", "Actual Goals", "Team Rank",
-                    "Overall Rank", "Goal Threat", "L5 S/GP", "L10 S/GP",
-                    "Shot Trend", "Goal Match", "Final Anytime",
+                    "Goal Match", "Overall Rank", "Goal Threat", "L5 S/GP", "L10 S/GP",
+                    "Shot Trend", "Final Anytime",
                     "Bet Tier", "Goalie Match", "Model Match",
                 ]],
                 use_container_width=True,
