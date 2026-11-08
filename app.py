@@ -1545,8 +1545,11 @@ if games:
                     & (pd.to_numeric(board_view["L5 S/GP"], errors="coerce") >= 2)
                     & (pd.to_numeric(board_view["Shot Trend"], errors="coerce") > 0)
                 ).fillna(False)
-                board_display.loc[diamond_checks, "Player"] = (
-                    "💎 " + board_display.loc[diamond_checks, "Player"].astype(str)
+                # Keep player names clean; display the signal in its own column.
+                board_display.insert(
+                    board_display.columns.get_loc("Player") + 1,
+                    "Longshot",
+                    diamond_checks.map({True: "💎", False: ""}),
                 )
                 st.caption(
                     f"💎 Longshot Watch: {int(diamond_checks.sum())} visible candidates "
