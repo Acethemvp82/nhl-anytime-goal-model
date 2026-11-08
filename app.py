@@ -1130,8 +1130,8 @@ if games:
                 skaters_df[col] = skaters_df[col].round(1)
         main_columns = [
             "Overall Rank", "Game Time", "Team Rank", "Player", "Team", "Hammer",
-            "Goal Threat", "Goal Match", "Final Anytime", "Bet Tier",
-            "Goalie Match", "L5 S/GP", "Shot Trend", "Lineup Status",
+            "Goal Match", "Goal Threat", "Final Anytime", "Goalie Match",
+            "Bet Tier", "L5 S/GP", "Shot Trend", "Lineup Status",
         ]
         advanced_columns = [
             "Overall Rank", "Team Rank", "Player", "Team", "Opponent",
