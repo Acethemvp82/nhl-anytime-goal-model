@@ -1695,6 +1695,24 @@ if games:
                 )
                 if len(target_display) < 5:
                     st.caption("Fewer than five players are available on the model board for this opponent.")
+        # Keep scorer tables aligned with the main board without changing model data.
+        def goal_scorer_display(rows):
+            view = rows.copy()
+            view["Longshot"] = (
+                (pd.to_numeric(view["Team Rank"], errors="coerce") >= 6)
+                & (pd.to_numeric(view["Goal Match"], errors="coerce") >= 55)
+                & (pd.to_numeric(view["Goalie Match"], errors="coerce") >= 45)
+                & (pd.to_numeric(view["L5 S/GP"], errors="coerce") >= 2)
+                & (pd.to_numeric(view["Shot Trend"], errors="coerce") > 0)
+            ).fillna(False).map({True: "💎", False: ""})
+            display_columns = [
+                "Overall Rank", "Team Rank", "Player", "Team", "Actual Goals",
+                "Hammer", "Longshot", "Goal Match", "Goal Threat",
+                "Final Anytime", "Goalie Match", "Bet Tier",
+                "L5 S/GP", "Shot Trend", "Lineup Status", "Model Match",
+            ]
+            return view[display_columns]
+
         # Automatic same-day goal tracker, analogous to the MLB HR Tracker.
         st.divider()
         st.subheader("🏒 Live Goal Tracker")
@@ -1731,16 +1749,10 @@ if games:
                 "both": "✅ In Model", "left_only": "❌ Not In Model"
             }).astype(str)
             live_tracker["Player"] = live_tracker["Player"].fillna("Not on current board")
-            tracker_columns = [
-                "Player", "Team", "Actual Goals", "Overall Rank", "Team Rank",
-                "Goal Match", "Goal Threat", "L5 S/GP", "L10 S/GP", "Shot Trend",
-                "Final Anytime", "Bet Tier",
-                "Goalie Match", "Model Match"
-            ]
             st.dataframe(
-                live_tracker[tracker_columns].sort_values(
+                goal_scorer_display(live_tracker.sort_values(
                     ["Actual Goals", "Overall Rank"], ascending=[False, True]
-                ), use_container_width=True, hide_index=True
+                )), use_container_width=True, hide_index=True
             )
             st.caption("Live results update with GameCenter's 5-minute cache. Scores and rankings may change during games.")
         else:
@@ -1795,7 +1807,7 @@ if games:
                 "Player_ID", "Team", "Player", "Overall Rank", "Team Rank",
                 "Goal Threat", "L5 S/GP", "L10 S/GP", "Shot Trend",
                 "Goal Match", "Final Anytime", "Bet Tier",
-                "Goalie Match", "Lineup Status",
+                "Goalie Match", "Lineup Status", "Hammer",
             ]
             tracker_df = actual_df.merge(
                 skaters_df[model_columns],
@@ -1817,12 +1829,7 @@ if games:
                 int(tracker_df["Overall Rank"].notna().sum()),
             )
             st.dataframe(
-                tracker_df[[
-                    "Player", "Team", "Actual Goals", "Team Rank",
-                    "Goal Match", "Overall Rank", "Goal Threat", "L5 S/GP", "L10 S/GP",
-                    "Shot Trend", "Final Anytime",
-                    "Bet Tier", "Goalie Match", "Model Match",
-                ]],
+                goal_scorer_display(tracker_df),
                 use_container_width=True,
                 hide_index=True,
             )
