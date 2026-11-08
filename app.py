@@ -1547,7 +1547,7 @@ if games:
                 ).fillna(False)
                 # Keep player names clean; display the signal in its own column.
                 board_display.insert(
-                    board_display.columns.get_loc("Player") + 1,
+                    board_display.columns.get_loc("Hammer") + 1,
                     "Longshot",
                     diamond_checks.map({True: "💎", False: ""}),
                 )
