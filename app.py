@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+from simulation import simulate_skaters
 import requests
 import base64
 import time
@@ -1128,6 +1129,45 @@ if games:
         for col in ["Opp GA/GP", "Goal Threat", "Goal Match", "Goalie Match", "Final Anytime"]:
             if col in skaters_df.columns:
                 skaters_df[col] = skaters_df[col].round(1)
+        # Standalone experimental Monte Carlo: no impact on rankings or qualifiers.
+        with st.expander("🎲 Monte Carlo Simulator — 10,000 trials (research only)"):
+            st.caption(
+                "Uses recent shots/game and smoothed season goals per shot. "
+                "This is a provisional Poisson model, NOT a calibrated betting probability. "
+                "It does not change Goal Match, Final Anytime, ranks, tiers or 🔨."
+            )
+            st.caption(
+                "Runs locally with existing data; no additional NHL API calls. "
+                "Requires at least 5 games, 10 shots and available L10 shots/game. "
+                "Missing inputs are shown as —, not as zero."
+            )
+            if st.button("Run 10,000 simulations", key="nhl_monte_carlo_run"):
+                with st.spinner("Simulating goal outcomes..."):
+                    sim_view = simulate_skaters(
+                        skaters_df, trials=10_000, slate_date=selected_date
+                    )
+                coverage = int(sim_view["Sim Goal %"].notna().sum())
+                st.caption(f"Simulation coverage: {coverage}/{len(sim_view)} skaters.")
+                st.dataframe(
+                    sim_view[[
+                        "Overall Rank", "Team Rank", "Player", "Team",
+                        "Final Anytime", "Hammer", "Sim Goal %",
+                        "Sim xGoals", "Sim 95% MC Low", "Sim 95% MC High",
+                    ]].style.format({
+                        "Sim Goal %": "{:.1f}",
+                        "Sim xGoals": "{:.3f}",
+                        "Sim 95% MC Low": "{:.1f}",
+                        "Sim 95% MC High": "{:.1f}",
+                    }, na_rep="—"),
+                    hide_index=True, use_container_width=True,
+                )
+                st.caption(
+                    "95% MC intervals reflect simulation sampling only, not "
+                    "uncertainty in player skill, lineup, opponent or goalie. "
+                    "Historical selections are NOT valid backtests until all "
+                    "input statistics are frozen strictly before puck drop."
+                )
+
         main_columns = [
             "Overall Rank", "Game Time", "Team Rank", "Player", "Team", "Hammer",
             "Goal Match", "Goal Threat", "Final Anytime", "Goalie Match",
