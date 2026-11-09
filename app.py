@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import hashlib
 import requests
 import base64
 import time
@@ -50,44 +51,66 @@ def style_board_tier(value):
 @st.cache_data(ttl=1800, show_spinner=False)
 def run_goal_monte_carlo(records, slate_date, simulations=10000):
     """Experimental shots-to-goals simulation; independent of board rankings."""
-    rng = np.random.default_rng(20261109 + int(str(slate_date).replace("-", "")))
+    if isinstance(simulations, bool) or not isinstance(simulations, int) or not 1 <= simulations <= 100_000:
+        raise ValueError("simulations must be an integer between 1 and 100,000")
     results = []
     for item in records:
         (player_id, player, team, overall_rank, team_rank, hammer,
          goals, shots, gp, season_spg, recent_spg, opp_ga, goalie_match,
          goal_match, goal_threat, final_anytime, lineup_status, shot_trend) = item
-        gp = float(gp or 0)
-        goals = max(0.0, float(goals or 0))
-        shots = max(0.0, float(shots or 0))
-        season_spg = max(0.0, float(season_spg or 0))
-        recent_spg = float(recent_spg) if recent_spg is not None and np.isfinite(recent_spg) else np.nan
+        def finite_number(value):
+            try:
+                number = float(value)
+                return number if np.isfinite(number) else None
+            except (TypeError, ValueError, OverflowError):
+                return None
+
+        gp, goals, shots, season_spg = map(finite_number, (gp, goals, shots, season_spg))
+        recent_spg = finite_number(recent_spg)
+        recent_spg = recent_spg if recent_spg is not None and recent_spg >= 0 else np.nan
+        result = {
+            "Overall Rank": overall_rank, "Team Rank": team_rank,
+            "Player": player, "Team": team, "Hammer": hammer,
+            "Longshot": "", "Sim Goal %": np.nan, "Sim Avg Goals": np.nan,
+            "Goal Match": goal_match, "Goal Threat": goal_threat,
+            "Final Anytime": final_anytime, "Goalie Match": goalie_match,
+            "Lineup Status": lineup_status,
+            "Sim Status": "Insufficient data", "Sim Trials": simulations,
+        }
+        if (any(value is None for value in (gp, goals, shots, season_spg))
+                or gp < 5 or shots < 10 or goals < 0 or goals > shots or season_spg < 0):
+            results.append(result)
+            continue
+        # Each player's random stream stays fixed when other rows move or disappear.
+        identity = f"{slate_date}|{player_id}|{team}|{simulations}"
+        seed = int.from_bytes(hashlib.sha256(identity.encode()).digest()[:8], "big")
+        rng = np.random.default_rng(seed)
         # Shrink small samples toward a conservative 10% shot conversion baseline.
         shot_conversion = np.clip((goals + 3.0) / (shots + 30.0), 0.02, 0.30)
         volume = season_spg if not np.isfinite(recent_spg) else 0.65 * season_spg + 0.35 * max(0, recent_spg)
         # Moderate opponent/goalie modifiers to avoid treating heuristic scores as probabilities.
-        opp_ga = float(opp_ga or 0)
+        opp_ga = finite_number(opp_ga) or 0
+        goalie_value = finite_number(goalie_match)
+        goalie_value = 50 if goalie_value is None else goalie_value
         defense_factor = np.clip(opp_ga / 3.0, 0.85, 1.15) if opp_ga > 0 else 1.0
-        goalie_factor = np.clip(1.0 + (float(goalie_match or 50) - 50) / 250.0, 0.8, 1.2)
+        goalie_factor = np.clip(1.0 + (goalie_value - 50) / 250.0, 0.8, 1.2)
         shot_lambda = np.clip(volume * defense_factor, 0, 12)
         shots_simulated = rng.poisson(shot_lambda, size=simulations)
         goals_simulated = rng.binomial(shots_simulated, np.clip(shot_conversion * goalie_factor, 0.01, 0.4))
         hit_rate = float(np.mean(goals_simulated >= 1))
         longshot = (
             pd.notna(team_rank) and float(team_rank) >= 6
-            and float(goal_match or 0) >= 55 and float(goalie_match or 0) >= 45
+            and float(goal_match or 0) >= 55 and goalie_value >= 45
             and np.isfinite(recent_spg) and recent_spg >= 2
             and pd.notna(shot_trend) and float(shot_trend) > 0
         )
-        results.append({
-            "Overall Rank": overall_rank, "Team Rank": team_rank,
-            "Player": player, "Team": team, "Hammer": hammer,
+        result.update({
             "Longshot": "💎" if longshot else "",
             "Sim Goal %": round(hit_rate * 100, 1),
             "Sim Avg Goals": round(float(np.mean(goals_simulated)), 2),
-            "Goal Match": goal_match, "Goal Threat": goal_threat,
-            "Final Anytime": final_anytime, "Goalie Match": goalie_match,
-            "Lineup Status": lineup_status,
+            "Sim Status": "Ready" if np.isfinite(recent_spg) else "Season shots fallback",
         })
+        results.append(result)
     return pd.DataFrame(results)
 
 
@@ -1637,7 +1660,7 @@ if games:
             "sportsbook odds or validated goal probabilities. Original ranks and qualifiers stay unchanged."
         )
         with st.expander("🎲 View Monte Carlo results", expanded=False):
-            st.caption("10,000 independent simulated games per player; fixed random seed for reproducible results on the same slate.")
+            st.caption("10,000 independent simulated games per player; fixed player seeds for reproducible results. Requires 5 games and 10 shots; missing recent shots use season volume.")
             simulation_records = []
             for _, player_row in skaters_df.iterrows():
                 def numeric_or(value, fallback=0):
@@ -1646,9 +1669,9 @@ if games:
                 simulation_records.append((
                     str(player_row["Player_ID"]), player_row["Player"], player_row["Team"],
                     numeric_or(player_row["Overall Rank"]), numeric_or(player_row["Team Rank"]),
-                    player_row["Hammer"], numeric_or(player_row["Goals"]),
-                    numeric_or(player_row["Shots"]), numeric_or(player_row["GP"]),
-                    numeric_or(player_row["S/GP"]),
+                    player_row["Hammer"], numeric_or(player_row["Goals"], None),
+                    numeric_or(player_row["Shots"], None), numeric_or(player_row["GP"], None),
+                    numeric_or(player_row["S/GP"], None),
                     numeric_or(player_row["L5 S/GP"], None),
                     numeric_or(player_row["Opp GA/GP"]),
                     numeric_or(player_row["Goalie Match"], 50),
@@ -1658,22 +1681,31 @@ if games:
                     player_row["Lineup Status"],
                     numeric_or(player_row["Shot Trend"], None),
                 ))
+            simulation_signature = hashlib.sha256(
+                repr((selected_date, simulation_records)).encode("utf-8")
+            ).hexdigest()
             if st.button("Run 10,000 simulations", key="nhl_run_monte_carlo"):
                 with st.spinner("Simulating the NHL slate..."):
                     st.session_state["nhl_sim_results"] = run_goal_monte_carlo(
                         tuple(simulation_records), selected_date, 10000
                     )
-                    st.session_state["nhl_sim_date"] = selected_date
+                    st.session_state["nhl_sim_signature"] = simulation_signature
             sim_results = st.session_state.get("nhl_sim_results")
-            if sim_results is not None and st.session_state.get("nhl_sim_date") == selected_date:
+            if sim_results is not None and st.session_state.get("nhl_sim_signature") == simulation_signature:
                 sim_sorted = sim_results.sort_values(
                     ["Sim Goal %", "Final Anytime"], ascending=[False, False]
                 )
+                sim_sorted = sim_sorted.copy()
+                sim_sorted.insert(0, "Sim Rank", sim_sorted["Sim Goal %"].rank(
+                    method="min", ascending=False, na_option="keep"
+                ).astype("Int64"))
+                coverage = int(sim_sorted["Sim Goal %"].notna().sum())
+                st.caption(f"Simulation coverage: {coverage}/{len(sim_sorted)} skaters. Missing results appear as —.")
                 st.dataframe(
                     sim_sorted.style
                     .map(style_board_score, subset=["Goal Match", "Goal Threat", "Final Anytime", "Goalie Match"])
                     .format({"Sim Goal %": "{:.1f}%", "Sim Avg Goals": "{:.2f}",
-                             "Overall Rank": "{:.0f}", "Team Rank": "{:.0f}"}),
+                             "Overall Rank": "{:.0f}", "Team Rank": "{:.0f}"}, na_rep="—"),
                     use_container_width=True, hide_index=True
                 )
                 st.download_button(
