@@ -1,0 +1,41 @@
+name: NHL simulator validation
+
+on:
+  push:
+    branches:
+      - feature/nhl-monte-carlo-10000
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install application dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Compile app and simulator
+        run: python -m py_compile app.py simulation.py test_simulation.py
+      - name: Run simulator unit tests
+        run: python -m unittest -v test_simulation.py
+      - name: Start Streamlit and check health endpoint
+        shell: bash
+        run: |
+          streamlit run app.py --server.headless true --server.port 8501 > /tmp/streamlit.log 2>&1 &
+          PID=$!
+          trap 'kill $PID 2>/dev/null || true' EXIT
+          for i in {1..30}; do
+            if curl -fsS http://localhost:8501/_stcore/health; then
+              exit 0
+            fi
+            if ! kill -0 $PID 2>/dev/null; then
+              cat /tmp/streamlit.log
+              exit 1
+            fi
+            sleep 2
+          done
+          cat /tmp/streamlit.log
+          exit 1
