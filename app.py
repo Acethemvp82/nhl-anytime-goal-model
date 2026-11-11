@@ -1755,6 +1755,69 @@ if games:
                 use_container_width=True,
                 hide_index=True,
             )
+        # Keep scorer tables aligned with the main board without changing model data.
+        def goal_scorer_display(rows):
+            view = rows.copy()
+            view["Longshot"] = (
+                (pd.to_numeric(view["Team Rank"], errors="coerce") >= 6)
+                & (pd.to_numeric(view["Goal Match"], errors="coerce") >= 55)
+                & (pd.to_numeric(view["Goalie Match"], errors="coerce") >= 45)
+                & (pd.to_numeric(view["L5 S/GP"], errors="coerce") >= 2)
+                & (pd.to_numeric(view["Shot Trend"], errors="coerce") > 0)
+            ).fillna(False).map({True: "💎", False: ""})
+            display_columns = [
+                "Overall Rank", "Team Rank", "Player", "Team", "Actual Goals",
+                "Hammer", "Longshot", "Goal Match", "Goal Threat",
+                "Final Anytime", "Goalie Match", "Bet Tier",
+                "L5 S/GP", "Shot Trend", "Lineup Status", "Model Match",
+            ]
+            return view[display_columns]
+
+        # Automatic same-day goal tracker, analogous to the MLB HR Tracker.
+        st.divider()
+        st.subheader("🏒 Live Goal Tracker")
+        st.caption("Automatically matches GameCenter goal scorers with the current model board. Rankings are live, not frozen pregame snapshots.")
+        scored_rows = []
+        game_states = {}
+        for game_id in sorted(set(game_id_map.values())):
+            if not game_id:
+                continue
+            boxscore = get_game_data(game_id)
+            game_states[game_id] = boxscore.get("gameState", "Unknown")
+            by_game = boxscore.get("playerByGameStats") or {}
+            for side in ("awayTeam", "homeTeam"):
+                team_abbrev = boxscore.get(side, {}).get("abbrev", "")
+                for group in ("forwards", "defense"):
+                    for skater in by_game.get(side, {}).get(group, []):
+                        goals_scored = int(skater.get("goals") or 0)
+                        if goals_scored > 0:
+                            scored_rows.append({
+                                "Game_ID": game_id,
+                                "Player_ID": skater.get("playerId"),
+                                "Team": team_abbrev,
+                                "Actual Goals": goals_scored,
+                            })
+        if scored_rows:
+            actual = pd.DataFrame(scored_rows).drop_duplicates(
+                subset=["Game_ID", "Player_ID"]
+            )
+            live_tracker = actual.merge(
+                skaters_df, on=["Player_ID", "Team"], how="left",
+                indicator=True
+            )
+            live_tracker["Model Match"] = live_tracker["_merge"].map({
+                "both": "✅ In Model", "left_only": "❌ Not In Model"
+            }).astype(str)
+            live_tracker["Player"] = live_tracker["Player"].fillna("Not on current board")
+            st.dataframe(
+                goal_scorer_display(live_tracker.sort_values(
+                    ["Actual Goals", "Overall Rank"], ascending=[False, True]
+                )), use_container_width=True, hide_index=True
+            )
+            st.caption("Live results update with GameCenter's 5-minute cache. Scores and rankings may change during games.")
+        else:
+            st.info("No goal scorers available in the selected slate's GameCenter boxscores yet.")
+
         st.divider()
         st.subheader("Opponent Vulnerability & Top Targets")
         st.caption(
@@ -1828,69 +1891,6 @@ if games:
                 )
                 if len(target_display) < 5:
                     st.caption("Fewer than five players are available on the model board for this opponent.")
-        # Keep scorer tables aligned with the main board without changing model data.
-        def goal_scorer_display(rows):
-            view = rows.copy()
-            view["Longshot"] = (
-                (pd.to_numeric(view["Team Rank"], errors="coerce") >= 6)
-                & (pd.to_numeric(view["Goal Match"], errors="coerce") >= 55)
-                & (pd.to_numeric(view["Goalie Match"], errors="coerce") >= 45)
-                & (pd.to_numeric(view["L5 S/GP"], errors="coerce") >= 2)
-                & (pd.to_numeric(view["Shot Trend"], errors="coerce") > 0)
-            ).fillna(False).map({True: "💎", False: ""})
-            display_columns = [
-                "Overall Rank", "Team Rank", "Player", "Team", "Actual Goals",
-                "Hammer", "Longshot", "Goal Match", "Goal Threat",
-                "Final Anytime", "Goalie Match", "Bet Tier",
-                "L5 S/GP", "Shot Trend", "Lineup Status", "Model Match",
-            ]
-            return view[display_columns]
-
-        # Automatic same-day goal tracker, analogous to the MLB HR Tracker.
-        st.divider()
-        st.subheader("🏒 Live Goal Tracker")
-        st.caption("Automatically matches GameCenter goal scorers with the current model board. Rankings are live, not frozen pregame snapshots.")
-        scored_rows = []
-        game_states = {}
-        for game_id in sorted(set(game_id_map.values())):
-            if not game_id:
-                continue
-            boxscore = get_game_data(game_id)
-            game_states[game_id] = boxscore.get("gameState", "Unknown")
-            by_game = boxscore.get("playerByGameStats") or {}
-            for side in ("awayTeam", "homeTeam"):
-                team_abbrev = boxscore.get(side, {}).get("abbrev", "")
-                for group in ("forwards", "defense"):
-                    for skater in by_game.get(side, {}).get(group, []):
-                        goals_scored = int(skater.get("goals") or 0)
-                        if goals_scored > 0:
-                            scored_rows.append({
-                                "Game_ID": game_id,
-                                "Player_ID": skater.get("playerId"),
-                                "Team": team_abbrev,
-                                "Actual Goals": goals_scored,
-                            })
-        if scored_rows:
-            actual = pd.DataFrame(scored_rows).drop_duplicates(
-                subset=["Game_ID", "Player_ID"]
-            )
-            live_tracker = actual.merge(
-                skaters_df, on=["Player_ID", "Team"], how="left",
-                indicator=True
-            )
-            live_tracker["Model Match"] = live_tracker["_merge"].map({
-                "both": "✅ In Model", "left_only": "❌ Not In Model"
-            }).astype(str)
-            live_tracker["Player"] = live_tracker["Player"].fillna("Not on current board")
-            st.dataframe(
-                goal_scorer_display(live_tracker.sort_values(
-                    ["Actual Goals", "Overall Rank"], ascending=[False, True]
-                )), use_container_width=True, hide_index=True
-            )
-            st.caption("Live results update with GameCenter's 5-minute cache. Scores and rankings may change during games.")
-        else:
-            st.info("No goal scorers available in the selected slate's GameCenter boxscores yet.")
-
         # Automatic tracker, modeled on the MLB HR Tracker.
         # These are CURRENT rankings, not a frozen pregame snapshot.
         st.divider()
