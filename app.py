@@ -1766,9 +1766,15 @@ if games:
                              "Overall Rank": "{:.0f}", "Team Rank": "{:.0f}"}, na_rep="—"),
                     use_container_width=True, hide_index=True
                 )
+                sim_export = sim_sorted.copy()
+                sim_export["Date"] = selected_date
+                sim_export["Player_ID"] = sim_export["Player"].map(
+                    skaters_df.drop_duplicates("Player").set_index("Player")["Player_ID"]
+                )
+                sim_export["Game_ID"] = sim_export["Team"].map(game_id_map)
                 st.download_button(
                     "📥 Download simulation results",
-                    sim_sorted.to_csv(index=False).encode("utf-8"),
+                    sim_export.to_csv(index=False).encode("utf-8"),
                     file_name=f"nhl_monte_carlo_{selected_date}.csv", mime="text/csv",
                 )
                 st.caption("Use these exploratory estimates alongside the board; do not interpret the ranking as a proven betting edge.")
@@ -2173,6 +2179,109 @@ if games:
             help="Save before games start; downloading again later may capture updated rankings.",
         )
 
+        st.markdown("### 🧪 Historical Simulator Validation")
+        st.caption(
+            "Upload pregame simulation CSV exports from multiple completed slates. "
+            "This compares frozen simulated goal percentages with actual NHL boxscores; "
+            "it does not rerun today's data on historical games."
+        )
+        validation_files = st.file_uploader(
+            "Pregame Monte Carlo CSVs (multiple dates)",
+            type=["csv"], accept_multiple_files=True,
+            key="nhl_sim_validation_upload",
+        )
+        if validation_files:
+            validation_frames = []
+            rejected_files = []
+            for sim_file in validation_files:
+                try:
+                    sim_saved = pd.read_csv(sim_file)
+                    needed = {"Player", "Team", "Sim Goal %"}
+                    if not needed.issubset(sim_saved.columns):
+                        rejected_files.append(sim_file.name + " (missing columns)")
+                        continue
+                    # Require immutable game/player identifiers from the pregame export.
+                    if not {"Date", "Game_ID", "Player_ID"}.issubset(sim_saved.columns):
+                        rejected_files.append(sim_file.name + " (needs Date, Game_ID, Player_ID)")
+                        continue
+                    sim_saved["Sim Goal %"] = pd.to_numeric(sim_saved["Sim Goal %"], errors="coerce")
+                    sim_saved["Game_ID"] = pd.to_numeric(sim_saved["Game_ID"], errors="coerce")
+                    sim_saved["Player_ID"] = pd.to_numeric(sim_saved["Player_ID"], errors="coerce")
+                    sim_saved = sim_saved.dropna(subset=["Sim Goal %", "Game_ID", "Player_ID"])
+                    sim_saved = sim_saved[sim_saved["Sim Goal %"].between(0, 100)]
+                    validation_frames.append(sim_saved)
+                except (ValueError, pd.errors.ParserError):
+                    rejected_files.append(sim_file.name + " (unreadable)")
+            if rejected_files:
+                st.warning("Skipped: " + "; ".join(rejected_files))
+            if validation_frames:
+                historical = pd.concat(validation_frames, ignore_index=True)
+                historical = historical.drop_duplicates(subset=["Date", "Game_ID", "Player_ID"])
+                historical["Game_ID"] = historical["Game_ID"].astype(int)
+                historical["Player_ID"] = historical["Player_ID"].astype(int)
+                historical_goals = {}
+                for gid in historical["Game_ID"].unique():
+                    box = get_game_data(int(gid))
+                    if str(box.get("gameState", "")).upper() not in ("OFF", "FINAL"):
+                        continue
+                    stats = box.get("playerByGameStats") or {}
+                    if not stats:
+                        continue
+                    scored_by_id = {}
+                    for side in ("awayTeam", "homeTeam"):
+                        for group in ("forwards", "defense"):
+                            for p in stats.get(side, {}).get(group, []):
+                                if p.get("playerId") is not None:
+                                    scored_by_id[int(p["playerId"])] = int(p.get("goals") or 0)
+                    historical_goals[int(gid)] = scored_by_id
+                historical = historical[historical["Game_ID"].isin(historical_goals)].copy()
+                # Exclude absent players rather than counting DNP as a miss.
+                historical = historical[historical.apply(
+                    lambda row: row["Player_ID"] in historical_goals[row["Game_ID"]], axis=1
+                )].copy() if not historical.empty else historical
+                if historical.empty:
+                    st.info("No completed-game player appearances available in these exports yet.")
+                else:
+                    historical["Scored"] = historical.apply(
+                        lambda row: historical_goals[row["Game_ID"]][row["Player_ID"]] > 0,
+                        axis=1,
+                    )
+                    historical["Predicted"] = historical["Sim Goal %"] / 100.0
+                    historical["Brier"] = (historical["Predicted"] - historical["Scored"].astype(float)) ** 2
+                    st.metric("Validated appearances", len(historical))
+                    st.metric("Completed slates", historical["Date"].nunique())
+                    st.metric("Brier score (lower is better)", f"{historical['Brier'].mean():.3f}")
+                    st.caption(
+                        "Brier score measures forecast error (0 best). "
+                        "Compare against a baseline before interpreting model skill. "
+                        "Historical validation requires genuinely pregame exports."
+                    )
+                    bins = pd.cut(
+                        historical["Sim Goal %"], bins=[-0.01, 20, 40, 60, 80, 100],
+                        labels=["0–20%", "20–40%", "40–60%", "60–80%", "80–100%"],
+                    )
+                    calibration = historical.groupby(bins, observed=True).agg(
+                        Players=("Scored", "size"),
+                        Average_Predicted=("Sim Goal %", "mean"),
+                        Actual_Goal_Rate=("Scored", "mean"),
+                    ).reset_index().rename(columns={
+                        "Sim Goal %": "Predicted Band",
+                        "Average_Predicted": "Avg Sim Goal %",
+                        "Actual_Goal_Rate": "Actual Goal %",
+                    })
+                    calibration["Actual Goal %"] = (calibration["Actual Goal %"] * 100).round(1)
+                    calibration["Avg Sim Goal %"] = calibration["Avg Sim Goal %"].round(1)
+                    st.dataframe(calibration, use_container_width=True, hide_index=True)
+                    by_date = historical.groupby("Date").agg(
+                        Appearances=("Scored", "size"), Scorers=("Scored", "sum"),
+                        Brier=("Brier", "mean"),
+                    ).reset_index().sort_values("Date")
+                    st.dataframe(by_date, use_container_width=True, hide_index=True)
+                    st.download_button(
+                        "📥 Download validated simulation outcomes",
+                        historical.to_csv(index=False).encode("utf-8"),
+                        file_name="nhl_simulator_validation.csv", mime="text/csv",
+                    )
         uploaded_snapshot = st.file_uploader(
             "Upload a saved pregame rankings CSV to check actual goals",
             type=["csv"],
