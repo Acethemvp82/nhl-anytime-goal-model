@@ -1596,41 +1596,70 @@ if games:
                 "No changes to the model formula."
             )
 
-        st.subheader("🎯 Top 5 Goal Scorer Shortlist")
-        st.caption(
-            "Top five players by the existing Final Anytime ranking. "
-            "These are model candidates, not guaranteed scorers or calibrated probabilities. "
-            "Sample Check flags early-season volatility; it does not change the score."
-        )
-        shortlist = skaters_df.head(5).copy()
-        shortlist["Lineup Check"] = shortlist["Lineup Status"].apply(
-            lambda status: "⚠️ Roster candidate"
-            if status == "Roster Candidate" else "GameCenter dressed"
-        )
-        shortlist["Goalie Check"] = shortlist["Goalie Data"].apply(
-            lambda source: "⚠️ Neutral fallback"
-            if source.startswith("Neutral fallback") else source
-        )
-        # Early-season rates can be unstable; flag limited samples rather
-        # than silently presenting high scores as well-established signals.
-        shortlist["Sample Check"] = shortlist["GP"].apply(
-            lambda gp: "⚠️ <10 GP" if pd.notna(gp) and gp < 10
-            else ("Limited: 10–19 GP" if pd.notna(gp) and gp < 20
-                  else "20+ GP")
-        )
-        st.dataframe(
-            shortlist[[
-                "Overall Rank", "Player", "Team", "Goal Threat",
-                "Goal Match", "Final Anytime", "Bet Tier",
-                "Lineup Check", "Goalie Check", "Sample Check",
-            ]].style.format({
-                "Goal Threat": "{:.1f}",
-                "Goal Match": "{:.1f}",
-                "Final Anytime": "{:.1f}",
-            }),
-            use_container_width=True,
-            hide_index=True,
-        )
+        @st.fragment(run_every="5m")
+        def render_active_top_five():
+            # The full slate and its frozen rankings remain unchanged.
+            # Refresh game states so completed games roll off the shortlist.
+            try:
+                fresh_schedule = get_nhl_schedule()
+                latest_states = {
+                    game.get("id"): str(game.get("gameState", "")).upper()
+                    for week in fresh_schedule.get("gameWeek", [])
+                    for game in week.get("games", [])
+                }
+            except (requests.RequestException, ValueError, KeyError):
+                latest_states = {}
+            finished_states = {"OFF", "FINAL", "FINAL_OT", "FINAL_SO"}
+            finished_teams = {
+                team for team, game_id in game_id_map.items()
+                if latest_states.get(game_id, "").upper() in finished_states
+            }
+            st.subheader("🎯 Top 5 Goal Scorer Shortlist")
+            st.caption(
+                "Top five remaining players by the existing Final Anytime ranking. "
+                "Completed games automatically roll off (refreshes every 5 minutes). "
+                "Original model scores and ranks remain unchanged."
+            )
+            remaining = skaters_df[
+                ~skaters_df["Team"].isin(finished_teams)
+            ].copy()
+            shortlist = remaining.head(5).copy()
+            if finished_teams:
+                st.caption(
+                    f"Excluded {len(finished_teams) // 2} completed games from the shortlist."
+                )
+            if not latest_states:
+                st.warning("Live game status is unavailable; completed games may still appear.")
+            if shortlist.empty:
+                st.info("No remaining goal scorer candidates for today's slate.")
+                return
+            shortlist["Lineup Check"] = shortlist["Lineup Status"].apply(
+                lambda status: "⚠️ Roster candidate"
+                if status == "Roster Candidate" else "GameCenter dressed"
+            )
+            shortlist["Goalie Check"] = shortlist["Goalie Data"].apply(
+                lambda source: "⚠️ Neutral fallback"
+                if str(source).startswith("Neutral fallback") else source
+            )
+            shortlist["Sample Check"] = shortlist["GP"].apply(
+                lambda gp: "⚠️ <10 GP" if pd.notna(gp) and gp < 10
+                else ("Limited: 10–19 GP" if pd.notna(gp) and gp < 20
+                      else "20+ GP")
+            )
+            st.dataframe(
+                shortlist[[
+                    "Overall Rank", "Player", "Team", "Goal Threat",
+                    "Goal Match", "Final Anytime", "Bet Tier",
+                    "Lineup Check", "Goalie Check", "Sample Check",
+                ]].style.format({
+                    "Goal Threat": "{:.1f}",
+                    "Goal Match": "{:.1f}",
+                    "Final Anytime": "{:.1f}",
+                }),
+                use_container_width=True,
+                hide_index=True,
+            )
+        render_active_top_five()
         @st.fragment(run_every="5m")
         def render_active_goal_board():
             # Refresh only the visible board. Full slate and snapshots remain untouched.
