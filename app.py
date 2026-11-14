@@ -114,6 +114,64 @@ def run_goal_monte_carlo(records, slate_date, simulations=10000):
     return pd.DataFrame(results)
 
 
+def add_pregame_qualifiers(frame):
+    """Preserve recorded flags; derive only for legacy snapshots with sufficient fields."""
+    view = frame.copy()
+    required = {"Team Rank", "Final Anytime", "Goal Match", "Goalie Match", "L5 S/GP", "Shot Trend"}
+    if "Hammer" not in view:
+        view["Hammer"] = ""
+    if "Longshot" not in view:
+        view["Longshot"] = ""
+    if not required.issubset(view.columns):
+        return view
+    def metric(name):
+        return pd.to_numeric(view[name], errors="coerce")
+    hammer = (
+        (metric("Team Rank") <= 3) & (metric("Final Anytime") >= 65)
+        & (metric("Goal Match") >= 60) & (metric("Goalie Match") >= 45)
+        & (metric("L5 S/GP") >= 2)
+    ).fillna(False)
+    diamond = (
+        (metric("Team Rank") >= 6) & (metric("Goal Match") >= 55)
+        & (metric("Goalie Match") >= 45) & (metric("L5 S/GP") >= 2)
+        & (metric("Shot Trend") > 0)
+    ).fillna(False)
+    # Existing snapshot labels take precedence over recomputation.
+    view["Hammer"] = view["Hammer"].fillna("").astype(str).where(
+        view["Hammer"].fillna("").astype(str).str.len() > 0,
+        hammer.map({True: "🔨", False: ""}),
+    )
+    view["Longshot"] = view["Longshot"].fillna("").astype(str).where(
+        view["Longshot"].fillna("").astype(str).str.len() > 0,
+        diamond.map({True: "💎", False: ""}),
+    )
+    return view
+
+
+def render_qualifier_performance(scored):
+    """Hit rates are per eligible completed-game player appearance, not betting ROI."""
+    if scored.empty:
+        return
+    st.markdown("**🔨 Hammer / 💎 Longshot Performance**")
+    categories = [
+        ("🔨 Hammer", scored["Hammer"].eq("🔨")),
+        ("💎 Longshot", scored["Longshot"].eq("💎")),
+        ("Team #1–3", pd.to_numeric(scored["Team Rank"], errors="coerce").between(1, 3)),
+        ("Team #6+", pd.to_numeric(scored["Team Rank"], errors="coerce") >= 6),
+    ]
+    rows = []
+    for name, mask in categories:
+        subset = scored.loc[mask]
+        rows.append({
+            "Category": name, "Selections": len(subset),
+            "Scored": int(subset["Scored"].sum()),
+            "Missed": int((~subset["Scored"]).sum()),
+            "Hit Rate": round(100 * subset["Scored"].mean(), 1) if len(subset) else None,
+        })
+    st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
+    st.caption("Completed games only. Categories overlap; no odds or ROI are inferred.")
+
+
 @st.cache_data(ttl=300)
 def get_nhl_schedule():
     url = "https://api-web.nhle.com/v1/schedule/now"
@@ -1977,9 +2035,11 @@ if games:
             "Date", "Game_ID", "Player_ID", "Player", "Team", "Opponent",
             "Overall Rank", "Team Rank", "Goal Threat", "Goal Match",
             "Final Anytime", "Bet Tier", "Goalie Match", "Opp Goalie",
-            "Goalie Status", "Lineup Status"
+            "Goalie Status", "Lineup Status", "Hammer", "Longshot",
+            "L5 S/GP", "Shot Trend"
         ]
         snapshot_df = skaters_df.copy()
+        snapshot_df = add_pregame_qualifiers(snapshot_df)
         snapshot_df["Date"] = selected_date
         snapshot_df["Game_ID"] = snapshot_df["Team"].map(game_id_map)
         snapshot_df = snapshot_df[tracking_cols]
@@ -2082,6 +2142,8 @@ if games:
                         ), axis=1
                     )
                     frozen["Scored"] = frozen["Actual Goals"] > 0
+                    frozen = add_pregame_qualifiers(frozen)
+                    render_qualifier_performance(frozen)
                     for label, mask in (
                         ("Overall Top 5", frozen["Overall Rank"] <= 5),
                         ("Top 3 per team", frozen["Team Rank"] <= 3),
@@ -2095,8 +2157,8 @@ if games:
                     st.dataframe(
                         frozen[[
                             "Player", "Team", "Overall Rank", "Team Rank",
-                            "Goal Threat", "Goal Match", "Final Anytime",
-                            "Bet Tier", "Actual Goals", "Scored"
+                            "Hammer", "Longshot", "Goal Match", "Goal Threat",
+                            "Final Anytime", "Bet Tier", "Actual Goals", "Scored"
                         ]].sort_values("Overall Rank"),
                         use_container_width=True, hide_index=True,
                     )
@@ -2164,6 +2226,8 @@ if games:
                                 axis=1,
                             )
                             checked["Scored"] = checked["Actual Goals"] > 0
+                            checked = add_pregame_qualifiers(checked)
+                            render_qualifier_performance(checked)
                             st.metric("Tracked players", len(checked))
                             st.metric("Goal scorers in snapshot", int(checked["Scored"].sum()))
                             top_five = checked[checked["Team Rank"] <= 5]
@@ -2186,8 +2250,8 @@ if games:
                             )
                             result_cols = [
                                 "Date", "Player", "Team", "Team Rank", "Overall Rank",
-                                "Goal Threat", "Goal Match", "Final Anytime", "Bet Tier",
-                                "Goalie Match", "Actual Goals", "Scored"
+                                "Hammer", "Longshot", "Goal Match", "Goal Threat",
+                                "Final Anytime", "Bet Tier", "Goalie Match", "Actual Goals", "Scored"
                             ]
                             st.dataframe(
                                 checked[result_cols].sort_values(
