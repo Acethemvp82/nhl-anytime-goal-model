@@ -211,6 +211,42 @@ def get_team_roster(team, season_id=None):
                     time.sleep(3)
     raise RuntimeError(f"{team}: NHL roster unavailable ({last_error})")
 
+@st.cache_data(ttl=3600, show_spinner=False)
+def get_recent_opponent_defense(team, season_id, before_date):
+    """Completed regular-season team games strictly before the selected slate."""
+    url = f"https://api-web.nhle.com/v1/club-schedule-season/{team}/{season_id}"
+    try:
+        response = requests.get(url, timeout=12)
+        response.raise_for_status()
+        games = response.json().get("games", [])
+    except (requests.RequestException, ValueError, AttributeError):
+        return None
+    allowed = []
+    for game in games:
+        if (str(game.get("gameDate", "")) >= str(before_date)
+                or game.get("gameType") != 2
+                or str(game.get("gameState", "")).upper() not in ("OFF", "FINAL")):
+            continue
+        home = game.get("homeTeam") or {}
+        away = game.get("awayTeam") or {}
+        home_code = (home.get("abbrev") or "").upper()
+        away_code = (away.get("abbrev") or "").upper()
+        if team.upper() == home_code:
+            conceded = away.get("score")
+        elif team.upper() == away_code:
+            conceded = home.get("score")
+        else:
+            continue
+        if isinstance(conceded, (int, float)) and conceded >= 0:
+            allowed.append((str(game["gameDate"]), float(conceded)))
+    allowed.sort(key=lambda x: x[0], reverse=True)
+    if not allowed:
+        return None
+    last_ten = allowed[:10]
+    return {"L10 Opp GA/GP": round(sum(x[1] for x in last_ten) / len(last_ten), 2),
+            "L10 Opp Games": len(last_ten)}
+
+
 @st.cache_data(ttl=300)
 def get_game_data(game_id):
     url = f"https://api-web.nhle.com/v1/gamecenter/{game_id}/boxscore"
@@ -984,6 +1020,7 @@ if games:
                 goals = season_stats.get("goals") or 0
                 shots = season_stats.get("shots") or 0
     
+                stat_source = "Current season" if games_played else "Career fallback (no season games)"
                 if games_played == 0:
                     career_stats = featured.get("regularSeason", {}).get("career", {})
                     games_played = career_stats.get("gamesPlayed") or 0
@@ -1102,6 +1139,7 @@ if games:
                     "Goalie Data": opp_goalie.get("Source", "Neutral fallback (no SV%)"),
                     "Lineup Status": "Dressed (GameCenter)" if dressed_ids else "Roster Candidate",
                     "Position": position,
+                    "Stats Source": stat_source,
                     "GP": games_played,
                     "G/GP": goals_per_game,
                     "Shots": shots,
@@ -1259,10 +1297,23 @@ if games:
             "Goal Match", "Goal Threat", "Final Anytime", "Goalie Match",
             "Bet Tier", "L5 S/GP", "Shot Trend", "Lineup Status",
         ]
+        # Research-only opponent form: never enters Goal Match or ranking calculations.
+        recent_defense = {}
+        for opponent_team in sorted(set(opponent_map.values())):
+            if opponent_team and opponent_team != "TBD":
+                recent_defense[opponent_team] = get_recent_opponent_defense(
+                    opponent_team, season_id_roster, selected_date
+                )
+        skaters_df["L10 Opp GA/GP"] = skaters_df["Opponent"].map(
+            lambda opponent_team: (recent_defense.get(opponent_team) or {}).get("L10 Opp GA/GP")
+        )
+        skaters_df["L10 Opp Games"] = skaters_df["Opponent"].map(
+            lambda opponent_team: (recent_defense.get(opponent_team) or {}).get("L10 Opp Games")
+        )
         advanced_columns = [
             "Overall Rank", "Team Rank", "Player", "Team", "Opponent",
             "Game Time", "Goals", "GP", "G/GP", "Shots", "S/GP", "L5 S/GP", "L10 S/GP", "Shot Trend", "Shot Games",
-            "Opp GA/GP", "Position", "Player_ID", "Goalie Status", "Goalie Data",
+            "Opp GA/GP", "L10 Opp GA/GP", "L10 Opp Games", "Stats Source", "Position", "Player_ID", "Goalie Status", "Goalie Data",
             "L5 Goals", "L10 Goals", "L5 G/GP", "L10 G/GP",
             "PP Goals", "PP Points", "PP G/GP", "PP P/GP",
             "Goal Threat", "Goal Match", "Goalie Match", "Final Anytime",
@@ -1812,6 +1863,22 @@ if games:
                     use_container_width=True,
                     hide_index=True,
                 )
+        with st.expander("🛡️ Opponent L10 Defense & Goalie Confirmation — research only"):
+            st.caption(
+                "Opponent last-10 goals allowed per game uses completed regular-season games "
+                "before the selected slate. Smaller samples show their game count. "
+                "Goalie status distinguishes confirmed GameCenter starters from unconfirmed proxies. "
+                "Career fallback is explicitly flagged. None of these research fields changes scores or ranks."
+            )
+            st.dataframe(
+                skaters_df[[
+                    "Player", "Team", "Opponent", "Opp GA/GP",
+                    "L10 Opp GA/GP", "L10 Opp Games",
+                    "Opp Goalie", "Goalie Status", "Goalie Data",
+                    "Stats Source", "Lineup Status",
+                ]],
+                use_container_width=True, hide_index=True,
+            )
         with st.expander("📊 Advanced Stats — Full Player Data"):
             st.caption("Includes L10 shots/game, opponent goalie, goalie-data source, and season statistics.")
             st.dataframe(
