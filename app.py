@@ -1240,8 +1240,12 @@ if games:
                     st.dataframe(
                         sim_sorted.style
                         .map(style_board_score, subset=["Goal Match", "Goal Threat", "Final Anytime", "Goalie Match"])
-                        .format({"Sim Goal %": "{:.1f}%", "Sim Avg Goals": "{:.2f}",
-                                 "Overall Rank": "{:.0f}", "Team Rank": "{:.0f}"}, na_rep="—"),
+                        .format({
+                            "Sim Goal %": "{:.1f}%", "Sim Avg Goals": "{:.2f}",
+                            "Overall Rank": "{:.0f}", "Team Rank": "{:.0f}",
+                            "Goal Match": "{:.0f}", "Goal Threat": "{:.0f}",
+                            "Final Anytime": "{:.0f}", "Goalie Match": "{:.0f}",
+                        }, na_rep="—"),
                         use_container_width=True, hide_index=True
                     )
                     sim_export = sim_sorted.copy()
