@@ -1322,105 +1322,6 @@ if games:
         season_start_research = int(selected_date[:4]) - (
             int(selected_date[5:7]) < 7
         )
-        chance_data, chance_status = get_chance_research(season_start_research)
-        research_df = skaters_df.copy()
-        if not chance_data.empty:
-            research_df = research_df.merge(
-                chance_data, on="Player_ID", how="left", validate="many_to_one"
-            )
-        for col in ("MP High Danger", "MP Shot Attempts", "MP xGoals",
-                    "MP Ice Time", "MP GP", "MP PP TOI Min"):
-            if col not in research_df:
-                research_df[col] = float("nan")
-        # Use rates only where the feed supplies an actual game count.
-        mp_gp = pd.to_numeric(research_df["MP GP"], errors="coerce")
-        research_df["MP HD/GP"] = (
-            research_df["MP High Danger"] / mp_gp.where(mp_gp > 0)
-        ).round(2)
-        research_df["MP Attempts/GP"] = (
-            research_df["MP Shot Attempts"] / mp_gp.where(mp_gp > 0)
-        ).round(2)
-        research_df["MP xG/GP"] = (
-            research_df["MP xGoals"] / mp_gp.where(mp_gp > 0)
-        ).round(3)
-        research_df["MP PP TOI/GP"] = (
-            research_df["MP PP TOI Min"] / mp_gp.where(mp_gp > 0)
-        ).round(2)
-        # Experimental comparison uses only independently observed rates.
-        # It is intentionally not a calibrated goal probability.
-        signals = ["MP HD/GP", "MP xG/GP", "MP Attempts/GP",
-                   "MP PP TOI/GP"]
-        valid = mp_gp.ge(5)
-        for signal in signals:
-            valid &= pd.to_numeric(
-                research_df[signal], errors="coerce"
-            ).notna()
-        research_df["Research Eligible"] = valid
-        research_df["Opportunity Score"] = float("nan")
-        research_df["Experimental Score"] = float("nan")
-        if valid.sum() >= 10:
-            # Percentile ranks limit extreme early-season outliers.
-            # Fixed equal weights are provisional and require backtesting.
-            component = pd.concat([
-                research_df.loc[valid, signal].rank(pct=True) * 100
-                for signal in signals
-            ], axis=1)
-            opportunity = component.mean(axis=1)
-            research_df.loc[valid, "Opportunity Score"] = opportunity.round(1)
-            research_df.loc[valid, "Experimental Score"] = (
-                0.80 * research_df.loc[valid, "Final Anytime"] +
-                0.20 * opportunity
-            ).round(1)
-        research_df["Experimental Rank"] = pd.NA
-        research_df["Experimental Team Rank"] = pd.NA
-        eligible_idx = research_df.loc[
-            research_df["Experimental Score"].notna()
-        ].sort_values(
-            ["Experimental Score", "Final Anytime"],
-            ascending=False
-        ).index
-        if len(eligible_idx):
-            research_df.loc[eligible_idx, "Experimental Rank"] = (
-                range(1, len(eligible_idx) + 1)
-            )
-            research_df.loc[eligible_idx, "Experimental Team Rank"] = (
-                research_df.loc[eligible_idx].groupby("Team").cumcount().to_numpy() + 1
-            )
-        with st.expander("🧪 Experimental Rankings — comparison only"):
-            st.caption(
-                "Experimental Score = 80% existing Final Anytime + 20% "
-                "equal-weight percentile average of high-danger attempts, "
-                "xGoals, shot attempts and 5-on-4 TOI per game. "
-                "Minimum five MoneyPuck games and all four signals required. "
-                "Players without coverage are unranked, not assigned zero. "
-                "This is NOT a calibrated probability, proven betting edge, "
-                "or a replacement for existing rankings."
-            )
-            st.caption(
-                f"Research coverage: {int(valid.sum())}/{len(research_df)} "
-                "skaters eligible. Seasonal MoneyPuck data can contain "
-                "future information for historical selected dates; "
-                "do not use this comparison as a historical backtest."
-            )
-            if not len(eligible_idx):
-                st.warning("Insufficient research data for experimental rankings.")
-            else:
-                st.dataframe(
-                    research_df.loc[eligible_idx, [
-                        "Experimental Rank", "Experimental Team Rank",
-                        "Player", "Team", "Opponent", "Team Rank",
-                        "Final Anytime", "Opportunity Score",
-                        "Experimental Score", "MP HD/GP", "MP xG/GP",
-                        "MP PP TOI/GP",
-                    ]].head(100),
-                    hide_index=True, use_container_width=True,
-                )
-                st.caption(
-                    "Compare Experimental Team Rank with original Team Rank. "
-                    "Actual goal outcomes must be tested using strictly "
-                    "pregame snapshots before any model weight changes."
-                )
-
         with st.expander("🛡️ Defense vs Position — research only"):
             st.caption(
                 "Shot-level MoneyPuck xG and unblocked attempts conceded "
@@ -1440,10 +1341,10 @@ if games:
                         "Original rankings remain unaffected."
                     )
                 else:
-                    positions = research_df["Position"].astype(str).str.upper().replace({
+                    positions = skaters_df["Position"].astype(str).str.upper().replace({
                         "L": "LW", "R": "RW",
                     })
-                    matchups = research_df.assign(Position=positions).merge(
+                    matchups = skaters_df.assign(Position=positions).merge(
                         position_data, on=["Opponent", "Position"],
                         how="left", validate="many_to_one"
                     )
@@ -1461,78 +1362,10 @@ if games:
                         }, na_rep="—"),
                         use_container_width=True, hide_index=True,
                     )
-                    # A separate on-demand positional experiment; the
-                    # existing Experimental Score and main board are unchanged.
-                    eligible_pos = (
-                        matchups["Experimental Score"].notna()
-                        & matchups["Pos xGA/GP"].notna()
-                        & matchups["Pos Shots/GP"].notna()
-                        & matchups["Def Games"].ge(5)
-                    )
-                    if eligible_pos.sum() >= 10:
-                        experiment = matchups.loc[eligible_pos].copy()
-                        # Positional rates are group-level context, not
-                        # individual goal probabilities. Rank only complete
-                        # observations within the selected slate.
-                        experiment["Position Matchup Score"] = (
-                            0.70 * experiment["Pos xGA/GP"].rank(pct=True) * 100
-                            + 0.30 * experiment["Pos Shots/GP"].rank(pct=True) * 100
-                        ).round(1)
-                        experiment["Position Adjusted Score"] = (
-                            0.85 * experiment["Experimental Score"]
-                            + 0.15 * experiment["Position Matchup Score"]
-                        ).round(1)
-                        experiment = experiment.sort_values(
-                            ["Position Adjusted Score", "Experimental Score"],
-                            ascending=False,
-                        ).copy()
-                        experiment["Position Overall Rank"] = range(
-                            1, len(experiment) + 1
-                        )
-                        experiment["Position Team Rank"] = (
-                            experiment.groupby("Team").cumcount() + 1
-                        )
-                        st.markdown("**🧪 Position-adjusted experimental rankings**")
-                        st.caption(
-                            "Research only: 85% existing Experimental Score + "
-                            "15% positional matchup percentile (70% opponent "
-                            "position xGA/GP, 30% opponent position shots/GP). "
-                            "Only players with complete data are ranked. "
-                            "This is NOT validated, a goal probability, or "
-                            "a replacement for the original Team Rank."
-                        )
-                        st.dataframe(
-                            experiment[[
-                                "Position Overall Rank", "Position Team Rank",
-                                "Player", "Team", "Opponent", "Team Rank",
-                                "Experimental Score", "Position Matchup Score",
-                                "Position Adjusted Score", "Pos xGA/GP",
-                            ]].head(100).style.format({
-                                "Team Rank": "{:.0f}",
-                                "Experimental Score": "{:.1f}",
-                                "Position Matchup Score": "{:.1f}",
-                                "Position Adjusted Score": "{:.1f}",
-                                "Pos xGA/GP": "{:.3f}",
-                            }, na_rep="—"),
-                            use_container_width=True, hide_index=True,
-                        )
-                        st.caption(
-                            "For a fair performance comparison, collect "
-                            "pregame snapshots and actual goal outcomes. "
-                            "Historical season-level opportunity data may "
-                            "contain future games and must not be backtested "
-                            "as though it were pregame."
-                        )
-                    else:
-                        st.info(
-                            "Insufficient complete coverage for position-adjusted "
-                            "experimental rankings (minimum 10 players)."
-                        )
                     st.caption(
                         "Source: MoneyPuck shot ZIP and skater position lookup. "
                         "Unmatched positions remain blank. Shot counts exclude "
-                        "blocked attempts. Research is not yet part of "
-                        "Experimental Score or Final Anytime."
+                        "blocked attempts. Research does not change Final Anytime."
                     )
 
         with st.expander("🧪 Scoring Opportunity Research — no ranking changes"):
