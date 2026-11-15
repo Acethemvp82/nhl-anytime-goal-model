@@ -1319,81 +1319,6 @@ if games:
             "Goal Threat", "Goal Match", "Goalie Match", "Final Anytime",
             "Bet Tier", "Opp Goalie", "Lineup Status",
         ]
-        season_start_research = int(selected_date[:4]) - (
-            int(selected_date[5:7]) < 7
-        )
-        with st.expander("🛡️ Defense vs Position — research only"):
-            st.caption(
-                "Shot-level MoneyPuck xG and unblocked attempts conceded "
-                "to opposing C, LW and RW. Pre-slate date cutoff; "
-                "at least five defensive games required. This is NOT "
-                "a goalscorer probability or a calibrated positional rank."
-            )
-            if st.button("Load position defense research", key="load_pos_def"):
-                with st.spinner("Loading shot-level position matchups..."):
-                    position_data, position_status = get_defense_by_position(
-                        season_start_research, selected_date
-                    )
-                st.caption("Feed: " + position_status)
-                if position_data.empty:
-                    st.warning(
-                        "No verified positional defense rows available. "
-                        "Original rankings remain unaffected."
-                    )
-                else:
-                    positions = skaters_df["Position"].astype(str).str.upper().replace({
-                        "L": "LW", "R": "RW",
-                    })
-                    matchups = skaters_df.assign(Position=positions).merge(
-                        position_data, on=["Opponent", "Position"],
-                        how="left", validate="many_to_one"
-                    )
-                    st.dataframe(
-                        matchups[[
-                            "Player", "Team", "Opponent", "Position",
-                            "Team Rank", "Final Anytime", "Def Games",
-                            "Pos Shots/GP", "Pos xGA/GP",
-                        ]].style.format({
-                            "Team Rank": "{:.0f}",
-                            "Final Anytime": "{:.1f}",
-                            "Def Games": "{:.0f}",
-                            "Pos Shots/GP": "{:.2f}",
-                            "Pos xGA/GP": "{:.3f}",
-                        }, na_rep="—"),
-                        use_container_width=True, hide_index=True,
-                    )
-                    st.caption(
-                        "Source: MoneyPuck shot ZIP and skater position lookup. "
-                        "Unmatched positions remain blank. Shot counts exclude "
-                        "blocked attempts. Research does not change Final Anytime."
-                    )
-
-        with st.expander("🧪 Scoring Opportunity Research — no ranking changes"):
-            st.caption(
-                "Recent goals use the same pre-slate NHL game logs as recent shots. "
-                "Power-play goals and points come from NHL player season statistics "
-                "where available. These are production measures, NOT "
-                "power-play ice time or high-danger chance counts. Missing data "
-                "remains blank. No research metric affects Goal Threat, Goal "
-                "Match, Final Anytime, Bet Tier, or Team Rank."
-            )
-            research_cols = [
-                "Overall Rank", "Team Rank", "Player", "Team", "GP",
-                "S/GP", "L5 S/GP", "L5 Goals", "L10 Goals",
-                "L5 G/GP", "L10 G/GP", "PP Goals", "PP Points",
-                "PP G/GP", "PP P/GP", "Final Anytime",
-            ]
-            st.dataframe(
-                skaters_df[research_cols].style.format({
-                    "S/GP": "{:.2f}", "L5 S/GP": "{:.2f}",
-                    "L5 Goals": "{:.0f}", "L10 Goals": "{:.0f}",
-                    "PP Goals": "{:.0f}", "PP Points": "{:.0f}",
-                    "L5 G/GP": "{:.2f}", "L10 G/GP": "{:.2f}",
-                    "PP G/GP": "{:.3f}", "PP P/GP": "{:.3f}",
-                    "Final Anytime": "{:.1f}",
-                }, na_rep="—"),
-                use_container_width=True, hide_index=True,
-            )
         @st.fragment(run_every="5m")
         def render_active_top_five():
             # The full slate and its frozen rankings remain unchanged.
@@ -1658,38 +1583,6 @@ if games:
                 st.caption("Use these exploratory estimates alongside the board; do not interpret the ranking as a proven betting edge.")
             else:
                 st.info("Run the simulator to see a separate ranking for this slate.")
-        with st.expander("📈 Shot Opportunity Watch — informational"):
-            st.caption(
-                "Shot Trend = L5 shots/game minus L10 shots/game (prior season included when needed). "
-                "Positive means higher recent volume, not a guaranteed goal."
-            )
-            watch = skaters_df.dropna(subset=["Shot Trend"]).copy()
-            if watch.empty:
-                st.info("No recent shot trends available yet.")
-            else:
-                watch["Shot Signal"] = watch["Shot Trend"].apply(
-                    lambda trend: (
-                        "RISING" if trend >= 1.0 else
-                        "UP" if trend >= 0.4 else
-                        "FALLING" if trend <= -1.0 else
-                        "DOWN" if trend <= -0.4 else
-                        "STEADY"
-                    )
-                )
-                watch = watch.sort_values("Shot Trend", ascending=False)
-                st.caption(
-                    "RISING: +1.0 or more shots/game; UP: +0.4 to +0.99; "
-                    "STEADY: between -0.4 and +0.4; DOWN: -0.4 to -0.99; "
-                    "FALLING: -1.0 or less. Descriptive thresholds only."
-                )
-                st.dataframe(
-                    watch[[
-                        "Player", "Team", "Team Rank", "L5 S/GP",
-                        "L10 S/GP", "Shot Trend", "Shot Signal", "Final Anytime", "Bet Tier"
-                    ]].head(20),
-                    use_container_width=True,
-                    hide_index=True,
-                )
         with st.expander("🛡️ Opponent L10 Defense & Goalie Confirmation — research only"):
             st.caption(
                 "Opponent last-10 goals allowed per game uses completed regular-season games "
