@@ -1270,17 +1270,14 @@ if games:
             ]
             return view[display_columns]
 
-        # Automatic same-day goal tracker, analogous to the MLB HR Tracker.
         st.divider()
         st.subheader("🏒 Live Goal Tracker")
         st.caption("Automatically matches GameCenter goal scorers with the current model board. Rankings are live, not frozen pregame snapshots.")
         scored_rows = []
-        game_states = {}
         for game_id in sorted(set(game_id_map.values())):
             if not game_id:
                 continue
             boxscore = get_game_data(game_id)
-            game_states[game_id] = boxscore.get("gameState", "Unknown")
             by_game = boxscore.get("playerByGameStats") or {}
             for side in ("awayTeam", "homeTeam"):
                 team_abbrev = boxscore.get(side, {}).get("abbrev", "")
@@ -1314,84 +1311,6 @@ if games:
             st.caption("Live results update with GameCenter's 5-minute cache. Scores and rankings may change during games.")
         else:
             st.info("No goal scorers available in the selected slate's GameCenter boxscores yet.")
-
-        # Automatic tracker, modeled on the MLB HR Tracker.
-        # These are CURRENT rankings, not a frozen pregame snapshot.
-        st.divider()
-        st.subheader("🏒 Automatic Goal Tracker")
-        st.caption(
-            "Actual goal scorers from completed games on the selected slate, "
-            "matched to the currently calculated model rankings. "
-            "For true pregame performance, use the saved snapshot tracker below."
-        )
-        scorer_rows = []
-        pending_games = []
-        for _, scheduled_game in daily_schedule.iterrows():
-            gid = scheduled_game["Game_ID"]
-            game_result = get_game_data(gid)
-            state = str(game_result.get("gameState", "")).upper()
-            by_game = game_result.get("playerByGameStats") or {}
-            if state not in ("OFF", "FINAL") or not by_game:
-                pending_games.append(
-                    f"{scheduled_game['Away']} vs {scheduled_game['Home']}"
-                )
-                continue
-            for side, team_code in (
-                ("awayTeam", scheduled_game["Away"]),
-                ("homeTeam", scheduled_game["Home"]),
-            ):
-                for group in ("forwards", "defense"):
-                    for skater in by_game.get(side, {}).get(group, []):
-                        goals_scored = int(skater.get("goals") or 0)
-                        player_id = skater.get("playerId")
-                        if goals_scored > 0 and player_id is not None:
-                            scorer_rows.append({
-                                "Player_ID": int(player_id),
-                                "Team": team_code,
-                                "Actual Goals": goals_scored,
-                            })
-        if pending_games:
-            st.info(
-                f"{len(pending_games)} game(s) not final or missing boxscore data. "
-                "Tracker results will appear as games finish."
-            )
-        if scorer_rows:
-            actual_df = pd.DataFrame(scorer_rows)
-            actual_df = actual_df.groupby(
-                ["Player_ID", "Team"], as_index=False
-            )["Actual Goals"].sum()
-            model_columns = [
-                "Player_ID", "Team", "Player", "Overall Rank", "Team Rank",
-                "Goal Threat", "L5 S/GP", "L10 S/GP", "Shot Trend",
-                "Goal Match", "Final Anytime", "Bet Tier",
-                "Goalie Match", "Lineup Status", "Hammer",
-            ]
-            tracker_df = actual_df.merge(
-                skaters_df[model_columns],
-                on=["Player_ID", "Team"],
-                how="left",
-            )
-            tracker_df["Model Match"] = tracker_df["Overall Rank"].apply(
-                lambda rank: "In Model" if pd.notna(rank) else "Not In Model"
-            )
-            tracker_df["Player"] = tracker_df["Player"].fillna(
-                tracker_df["Player_ID"].map(lambda pid: f"Player ID {pid}")
-            )
-            tracker_df = tracker_df.sort_values(
-                ["Actual Goals", "Overall Rank"], ascending=[False, True]
-            )
-            st.metric("Goals by tracked scorers", int(tracker_df["Actual Goals"].sum()))
-            st.metric(
-                "Scorers in current model",
-                int(tracker_df["Overall Rank"].notna().sum()),
-            )
-            st.dataframe(
-                goal_scorer_display(tracker_df),
-                use_container_width=True,
-                hide_index=True,
-            )
-        else:
-            st.info("No goal scorers from completed games on this slate yet.")
 
         # A CSV snapshot preserves the pregame rankings independently of Streamlit reruns.
         st.divider()
