@@ -1394,41 +1394,6 @@ if games:
                 }, na_rep="—"),
                 use_container_width=True, hide_index=True,
             )
-            st.caption(
-                "MoneyPuck research feed: " + chance_status +
-                ". Source: moneypuck.com/data.htm (non-commercial research; "
-                "credit MoneyPuck). These season-level figures may include "
-                "games AFTER a historical selected date, so they are never "
-                "used in rankings or pregame backtests."
-            )
-            st.caption(
-                "High-danger attempts, shot attempts and expected goals are "
-                "distinct statistics; they are not guaranteed to use the same "
-                "definitions as Prop Finder. Empty values mean unavailable data."
-            )
-            st.dataframe(
-                research_df[[
-                    "Overall Rank", "Team Rank", "Player", "Team",
-                    "MP GP", "MP HD/GP", "MP Attempts/GP", "MP xG/GP",
-                    "MP PP TOI/GP", "Final Anytime",
-                ]].style.format({
-                    "MP GP": "{:.0f}",
-                    "Final Anytime": "{:.1f}",
-                    "MP HD/GP": "{:.2f}",
-                    "MP Attempts/GP": "{:.2f}",
-                    "MP xG/GP": "{:.3f}",
-                    "MP PP TOI/GP": "{:.2f}",
-                }, na_rep="—"),
-                hide_index=True, use_container_width=True,
-            )
-            st.caption(
-                "Power-play TOI/GP is season 5-on-4 minutes divided by "
-                "season games played, not a recent-game or projected figure. "
-                "Opponent defense by position is available separately "
-                "on demand in Defense vs Position research. "
-                "No changes to the model formula."
-            )
-
         @st.fragment(run_every="5m")
         def render_active_top_five():
             # The full slate and its frozen rankings remain unchanged.
