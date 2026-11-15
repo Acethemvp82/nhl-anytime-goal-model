@@ -1166,69 +1166,99 @@ if games:
             "opponent/goalie adjustments. Percentages are uncalibrated estimates, NOT "
             "sportsbook odds or validated goal probabilities. Original ranks and qualifiers stay unchanged."
         )
-        with st.expander("🎲 View Monte Carlo results", expanded=False):
-            st.caption("10,000 independent simulated games per player; fixed player seeds for reproducible results. Requires 5 games and 10 shots; missing recent shots use season volume.")
-            simulation_records = []
-            for _, player_row in skaters_df.iterrows():
-                def numeric_or(value, fallback=0):
-                    parsed = pd.to_numeric(value, errors="coerce")
-                    return float(parsed) if pd.notna(parsed) else fallback
-                simulation_records.append((
-                    str(player_row["Player_ID"]), player_row["Player"], player_row["Team"],
-                    numeric_or(player_row["Overall Rank"]), numeric_or(player_row["Team Rank"]),
-                    player_row["Hammer"], numeric_or(player_row["Goals"], None),
-                    numeric_or(player_row["Shots"], None), numeric_or(player_row["GP"], None),
-                    numeric_or(player_row["S/GP"], None),
-                    numeric_or(player_row["L5 S/GP"], None),
-                    numeric_or(player_row["Opp GA/GP"]),
-                    numeric_or(player_row["Goalie Match"], 50),
-                    numeric_or(player_row["Goal Match"]),
-                    numeric_or(player_row["Goal Threat"]),
-                    numeric_or(player_row["Final Anytime"]),
-                    player_row["Lineup Status"],
-                    numeric_or(player_row["Shot Trend"], None),
-                ))
-            simulation_signature = hashlib.sha256(
-                repr((selected_date, simulation_records)).encode("utf-8")
-            ).hexdigest()
-            if st.button("Run 10,000 simulations", key="nhl_run_monte_carlo"):
-                with st.spinner("Simulating the NHL slate..."):
-                    st.session_state["nhl_sim_results"] = run_goal_monte_carlo(
-                        tuple(simulation_records), selected_date, 10000
+        @st.fragment(run_every="5m")
+        def render_goal_simulator():
+            with st.expander("🎲 View Monte Carlo results", expanded=False):
+                st.caption("10,000 independent simulated games per player; fixed player seeds for reproducible results. Requires 5 games and 10 shots; missing recent shots use season volume.")
+                st.caption(
+                    "Upcoming and in-progress games only. Game status refreshes every five minutes. "
+                    "Estimates for live games use full-game inputs."
+                )
+                try:
+                    fresh_schedule = get_nhl_schedule()
+                    latest_states = {
+                        game.get("id"): str(game.get("gameState", "")).upper()
+                        for week in fresh_schedule.get("gameWeek", [])
+                        for game in week.get("games", [])
+                    }
+                except (requests.RequestException, ValueError, KeyError):
+                    latest_states = {}
+                if not latest_states:
+                    st.warning("Game status is unavailable. The simulator will retry on refresh.")
+                    return
+
+                active_states = {"FUT", "PRE", "LIVE", "CRIT"}
+                active_game_ids = {
+                    game_id for game_id in game_id_map.values()
+                    if latest_states.get(game_id) in active_states
+                }
+                simulation_skaters = skaters_df[skaters_df["Team"].map(game_id_map).isin(active_game_ids)]
+                if simulation_skaters.empty:
+                    st.info("No upcoming or in-progress games with model skaters on this slate.")
+                    return
+
+                simulation_records = []
+                for _, player_row in simulation_skaters.iterrows():
+                    def numeric_or(value, fallback=0):
+                        parsed = pd.to_numeric(value, errors="coerce")
+                        return float(parsed) if pd.notna(parsed) else fallback
+                    simulation_records.append((
+                        str(player_row["Player_ID"]), player_row["Player"], player_row["Team"],
+                        numeric_or(player_row["Overall Rank"]), numeric_or(player_row["Team Rank"]),
+                        player_row["Hammer"], numeric_or(player_row["Goals"], None),
+                        numeric_or(player_row["Shots"], None), numeric_or(player_row["GP"], None),
+                        numeric_or(player_row["S/GP"], None),
+                        numeric_or(player_row["L5 S/GP"], None),
+                        numeric_or(player_row["Opp GA/GP"]),
+                        numeric_or(player_row["Goalie Match"], 50),
+                        numeric_or(player_row["Goal Match"]),
+                        numeric_or(player_row["Goal Threat"]),
+                        numeric_or(player_row["Final Anytime"]),
+                        player_row["Lineup Status"],
+                        numeric_or(player_row["Shot Trend"], None),
+                    ))
+                simulation_signature = hashlib.sha256(
+                    repr((selected_date, sorted(active_game_ids), simulation_records)).encode("utf-8")
+                ).hexdigest()
+                if st.button("Run 10,000 simulations", key="nhl_run_monte_carlo"):
+                    with st.spinner("Simulating the NHL slate..."):
+                        st.session_state["nhl_sim_results"] = run_goal_monte_carlo(
+                            tuple(simulation_records), selected_date, 10000
+                        )
+                        st.session_state["nhl_sim_signature"] = simulation_signature
+                sim_results = st.session_state.get("nhl_sim_results")
+                if sim_results is not None and st.session_state.get("nhl_sim_signature") == simulation_signature:
+                    sim_sorted = sim_results.sort_values(
+                        ["Sim Goal %", "Final Anytime"], ascending=[False, False]
                     )
-                    st.session_state["nhl_sim_signature"] = simulation_signature
-            sim_results = st.session_state.get("nhl_sim_results")
-            if sim_results is not None and st.session_state.get("nhl_sim_signature") == simulation_signature:
-                sim_sorted = sim_results.sort_values(
-                    ["Sim Goal %", "Final Anytime"], ascending=[False, False]
-                )
-                sim_sorted = sim_sorted.copy()
-                sim_sorted.insert(0, "Sim Rank", sim_sorted["Sim Goal %"].rank(
-                    method="min", ascending=False, na_option="keep"
-                ).astype("Int64"))
-                coverage = int(sim_sorted["Sim Goal %"].notna().sum())
-                st.caption(f"Simulation coverage: {coverage}/{len(sim_sorted)} skaters. Missing results appear as —.")
-                st.dataframe(
-                    sim_sorted.style
-                    .map(style_board_score, subset=["Goal Match", "Goal Threat", "Final Anytime", "Goalie Match"])
-                    .format({"Sim Goal %": "{:.1f}%", "Sim Avg Goals": "{:.2f}",
-                             "Overall Rank": "{:.0f}", "Team Rank": "{:.0f}"}, na_rep="—"),
-                    use_container_width=True, hide_index=True
-                )
-                sim_export = sim_sorted.copy()
-                sim_export["Date"] = selected_date
-                sim_export["Player_ID"] = sim_export["Player"].map(
-                    skaters_df.drop_duplicates("Player").set_index("Player")["Player_ID"]
-                )
-                sim_export["Game_ID"] = sim_export["Team"].map(game_id_map)
-                st.download_button(
-                    "📥 Download simulation results",
-                    sim_export.to_csv(index=False).encode("utf-8"),
-                    file_name=f"nhl_monte_carlo_{selected_date}.csv", mime="text/csv",
-                )
-                st.caption("Use these exploratory estimates alongside the board; do not interpret the ranking as a proven betting edge.")
-            else:
-                st.info("Run the simulator to see a separate ranking for this slate.")
+                    sim_sorted = sim_sorted.copy()
+                    sim_sorted.insert(0, "Sim Rank", sim_sorted["Sim Goal %"].rank(
+                        method="min", ascending=False, na_option="keep"
+                    ).astype("Int64"))
+                    coverage = int(sim_sorted["Sim Goal %"].notna().sum())
+                    st.caption(f"Simulation coverage: {coverage}/{len(sim_sorted)} skaters. Missing results appear as —.")
+                    st.dataframe(
+                        sim_sorted.style
+                        .map(style_board_score, subset=["Goal Match", "Goal Threat", "Final Anytime", "Goalie Match"])
+                        .format({"Sim Goal %": "{:.1f}%", "Sim Avg Goals": "{:.2f}",
+                                 "Overall Rank": "{:.0f}", "Team Rank": "{:.0f}"}, na_rep="—"),
+                        use_container_width=True, hide_index=True
+                    )
+                    sim_export = sim_sorted.copy()
+                    sim_export["Date"] = selected_date
+                    sim_export["Player_ID"] = sim_export["Player"].map(
+                        simulation_skaters.drop_duplicates("Player").set_index("Player")["Player_ID"]
+                    )
+                    sim_export["Game_ID"] = sim_export["Team"].map(game_id_map)
+                    st.download_button(
+                        "📥 Download simulation results",
+                        sim_export.to_csv(index=False).encode("utf-8"),
+                        file_name=f"nhl_monte_carlo_{selected_date}.csv", mime="text/csv",
+                    )
+                    st.caption("Use these exploratory estimates alongside the board; do not interpret the ranking as a proven betting edge.")
+                else:
+                    st.info("Run the simulator to see a separate ranking for this slate.")
+        render_goal_simulator()
         with st.expander("🛡️ Opponent L10 Defense & Goalie Confirmation — research only"):
             st.caption(
                 "Opponent last-10 goals allowed per game uses completed regular-season games "

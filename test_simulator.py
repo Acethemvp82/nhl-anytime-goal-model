@@ -74,7 +74,8 @@ class SimulatorTests(unittest.TestCase):
 
     def test_simulator_ui_rerun_download_and_changed_data(self):
         start = SOURCE.index('        st.divider()\n        st.subheader("🎲 10,000-Run')
-        end = SOURCE.index('        with st.expander("📈 Shot Opportunity Watch', start)
+        end = SOURCE.index('        render_goal_simulator()\n', start)
+        end += len('        render_goal_simulator()\n')
         ui = textwrap.dedent(SOURCE[start:end])
         styles = '\n\n'.join(ast.get_source_segment(SOURCE, n) for n in TREE.body
                                if isinstance(n, ast.FunctionDef) and n.name == 'style_board_score')
@@ -83,13 +84,28 @@ import pandas as pd
 import numpy as np
 import hashlib
 from datetime import date
+import requests
 selected_date = date(2026, 11, 9)
+game_id_map = {"BUF": 1, "TOR": 2, "PIT": 3}
+live_state = st.selectbox("Live game status", ["LIVE", "FINAL", "CRIT"])
+upcoming_state = st.selectbox("Upcoming game status", ["FUT", "OFF", "PRE"])
+def get_nhl_schedule():
+    return {"gameWeek": [{"games": [
+        {"id": 1, "gameState": upcoming_state},
+        {"id": 2, "gameState": live_state},
+        {"id": 3, "gameState": "FINAL"},
+    ]}]}
 volume = st.number_input("Test volume", value=3.)
 skaters_df = pd.DataFrame([{"Player_ID": 1, "Player": "Test Player", "Team": "BUF",
 "Overall Rank": 2, "Team Rank": 1, "Hammer": "🔨", "Goals": 12, "Shots": 120,
 "GP": 40, "S/GP": volume, "L5 S/GP": volume, "Opp GA/GP": 3., "Goalie Match": 50.,
 "Goal Match": 70., "Goal Threat": 75., "Final Anytime": 80.,
 "Lineup Status": "Projected", "Shot Trend": .5}])
+skaters_df = pd.concat([
+    skaters_df,
+    skaters_df.assign(Player_ID=2, Player="Live Player", Team="TOR", **{"Overall Rank": 3}),
+    skaters_df.assign(Player_ID=3, Player="Finished Player", Team="PIT", **{"Overall Rank": 1}),
+], ignore_index=True)
 '''
         at = AppTest.from_string(header + FUNCTION_SOURCE + '\n' + styles + '\n' + ui).run()
         self.assertEqual(len(at.exception), 0)
@@ -97,13 +113,27 @@ skaters_df = pd.DataFrame([{"Player_ID": 1, "Player": "Test Player", "Team": "BU
         self.assertEqual(len(at.exception), 0)
         self.assertEqual(len(at.dataframe), 1)
         self.assertIn('Sim Rank', at.dataframe[0].value.columns)
-        self.assertEqual(at.dataframe[0].value.iloc[0]['Overall Rank'], 2)
+        self.assertEqual(
+            dict(zip(at.dataframe[0].value['Player'], at.dataframe[0].value['Overall Rank'])),
+            {'Test Player': 2, 'Live Player': 3},
+        )
         at.run()
         self.assertEqual(len(at.dataframe), 1)
         self.assertIn('Download simulation results', at.get('download_button')[0].label)
         at.number_input[0].set_value(4.).run()
         self.assertEqual(len(at.exception), 0)
         self.assertEqual(len(at.dataframe), 0, 'Changed inputs must invalidate old results')
+        at.button[0].click().run()
+        at.selectbox[0].set_value('FINAL').run()
+        self.assertFalse(at.exception)
+        self.assertFalse(at.dataframe, 'A completed game must invalidate stale results')
+        at.button[0].click().run()
+        self.assertEqual(at.dataframe[0].value['Player'].tolist(), ['Test Player'])
+        at.selectbox[1].set_value('OFF').run()
+        self.assertFalse(at.exception)
+        self.assertFalse(at.button)
+        self.assertFalse(at.dataframe)
+        self.assertIn('No upcoming or in-progress games', at.info[0].value)
 
 
 if __name__ == '__main__':
