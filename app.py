@@ -834,9 +834,11 @@ if games:
             opponent_map[home_team] = away_team
             # Opponent goals-against per game
     opp_ga_map = {}
+    team_summary_map = {}
 
     for team in slate_teams:
             team_stats = get_team_stats(team)
+            team_summary_map[team] = team_stats
             data = team_stats.get("data", [])
 
             if data:
@@ -845,13 +847,13 @@ if games:
                 opp_ga_map[team] = 0
     game_data_map = {}
 
+    # Fetch each game once, then share the boxscore between both teams.
+    boxscores_by_id = {}
     for team in slate_teams:
         game_id = game_id_map.get(team)
-
-        if game_id:
-            game_data_map[team] = get_game_data(game_id)
-        else:
-            game_data_map[team] = {}     
+        if game_id and game_id not in boxscores_by_id:
+            boxscores_by_id[game_id] = get_game_data(game_id)
+        game_data_map[team] = boxscores_by_id.get(game_id, {})     
     # GameCenter starters take priority. Before lineups appear, select the
     # most-used roster goalie as an explicitly UNCONFIRMED proxy.
     goalie_map = {}
@@ -978,6 +980,9 @@ if games:
         for player in roster_players:
                 position = player.get("positionCode", "")
                 player_id = player.get("id")
+                # Don't request stats/logs for players excluded by a confirmed dressed list.
+                if player_id is None or (dressed_ids and player_id not in dressed_ids):
+                    continue
                 player_stats = get_player_stats(player_id)
                 # Exclude today's games to avoid post-puck-drop data leakage.
                 season_start = int(selected_date[:4])
@@ -1008,9 +1013,7 @@ if games:
                     full_name = f"Player ID {player_id}"
                
         
-                # Only use dressed skaters when GameCenter provides them
-                if dressed_ids and player_id not in dressed_ids:
-                    continue
+                # Dressed skater eligibility was checked before API requests.
 
     
                 featured = player_stats.get("featuredStats", {})
@@ -1042,22 +1045,19 @@ if games:
                 goals_per_game = round(goals / games_played, 3) if games_played else 0
                 shots_per_game = round(shots / games_played, 2) if games_played else 0
                 opponent = opponent_map.get(team, "TBD")
-                opponent_stats = get_team_stats(opponent)
-    
-                opponent_data = opponent_stats.get("data", [])
-    
+                # Reuse the exact same team summary response, cached before player processing.
+                opponent_data = team_summary_map.get(opponent, {}).get("data", [])
                 if opponent_data:
                     opponent_row = opponent_data[0]
                     opp_goals_against = opponent_row.get("goalsAgainst", 0)
                     opp_games_played = opponent_row.get("gamesPlayed", 0)
-    
                     opp_ga_per_game = (
                         round(opp_goals_against / opp_games_played, 2)
                         if opp_games_played else 0
                     )
                 else:
                     opp_ga_per_game = 0
-        
+
                 goal_rate_score = min(goals_per_game / 0.60, 1.0) * 50
                 shot_rate_score = min(shots_per_game / 4.0, 1.0) * 50
     
