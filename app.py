@@ -1270,9 +1270,6 @@ if games:
             ]
             return view[display_columns]
 
-        st.divider()
-        st.subheader("🏒 Live Goal Tracker")
-        st.caption("Automatically matches GameCenter goal scorers with the current model board. Rankings are live, not frozen pregame snapshots.")
         scored_rows = []
         for game_id in sorted(set(game_id_map.values())):
             if not game_id:
@@ -1291,6 +1288,7 @@ if games:
                                 "Team": team_abbrev,
                                 "Actual Goals": goals_scored,
                             })
+        live_tracker = None
         if scored_rows:
             actual = pd.DataFrame(scored_rows).drop_duplicates(
                 subset=["Game_ID", "Player_ID"]
@@ -1303,6 +1301,19 @@ if games:
                 "both": "✅ In Model", "left_only": "❌ Not In Model"
             }).astype(str)
             live_tracker["Player"] = live_tracker["Player"].fillna("Not on current board")
+        st.divider()
+        st.caption("Totals from available GameCenter boxscores for the selected slate, including games in progress.")
+        goal_total, scorer_total = st.columns(2)
+        goal_total.metric("Goals recorded", int(actual["Actual Goals"].sum()) if scored_rows else 0)
+        scorer_total.metric(
+            "Scorers in current model",
+            int(live_tracker.loc[live_tracker["_merge"] == "both", "Player_ID"].nunique())
+            if live_tracker is not None else 0,
+        )
+
+        st.subheader("🏒 Live Goal Tracker")
+        st.caption("Automatically matches GameCenter goal scorers with the current model board. Rankings are live, not frozen pregame snapshots.")
+        if live_tracker is not None:
             st.dataframe(
                 goal_scorer_display(live_tracker.sort_values(
                     ["Actual Goals", "Overall Rank"], ascending=[False, True]
