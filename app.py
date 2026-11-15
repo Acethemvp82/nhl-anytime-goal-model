@@ -13,12 +13,20 @@ st.set_page_config(
     layout="wide"
 )
 
+st.markdown("""<style>
+.block-container {padding-top: 2rem}
+h1 {letter-spacing: -1px}
+[data-testid="stMetric"] {background: #172236; padding: 16px; border-radius: 12px}
+div[data-testid="stCaptionContainer"] {color: #a9b8cc}
+.stTabs [role="tab"][aria-selected="true"] {color: #bfdbfe}
+</style>""", unsafe_allow_html=True)
+
 st.title("🏒 NHL Anytime Goal Scorer Model")
 st.caption("Goal Threat • Goal Match • Goalie Match • Final Anytime")
 
 def style_board_navy(value):
-    """Black background for non-score cells; keep colored scoring cells intact."""
-    return "background-color: #101010; color: #f1f5fb; font-weight: 500"
+    """First Basket navy background for non-score cells; keep score colors intact."""
+    return "background-color: #172236; color: #eef4fa; font-weight: 500"
 
 
 def style_board_score(value):
