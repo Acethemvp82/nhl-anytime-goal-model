@@ -1159,7 +1159,7 @@ if games:
                 )
         render_active_goal_board()
         st.divider()
-        st.subheader("🎲 10,000-Run Monte Carlo Goal Simulator")
+        st.subheader("🎲 Monte Carlo Goal Simulator")
         st.caption(
             "Experimental, separate from the official board. Simulates shot volume and "
             "shot-to-goal conversion using NHL season data, recent shots and conservative "
@@ -1169,7 +1169,7 @@ if games:
         @st.fragment(run_every="5m")
         def render_goal_simulator():
             with st.expander("🎲 View Monte Carlo results", expanded=False):
-                st.caption("10,000 independent simulated games per player; fixed player seeds for reproducible results. Requires 5 games and 10 shots; missing recent shots use season volume.")
+                st.caption("Fixed player seeds make results reproducible for each run count. Requires 5 games and 10 shots; missing recent shots use season volume.")
                 st.caption(
                     "Upcoming and in-progress games only. Game status refreshes every five minutes. "
                     "Estimates for live games use full-game inputs."
@@ -1197,6 +1197,13 @@ if games:
                     st.info("No upcoming or in-progress games with model skaters on this slate.")
                     return
 
+                simulations = st.radio(
+                    "Simulations per player",
+                    options=(10_000, 50_000),
+                    format_func=lambda count: "10,000 (Default)" if count == 10_000 else "50,000 (Closer look)",
+                    horizontal=True,
+                    key="nhl_sim_run_count",
+                )
                 simulation_records = []
                 for _, player_row in simulation_skaters.iterrows():
                     def numeric_or(value, fallback=0):
@@ -1218,12 +1225,12 @@ if games:
                         numeric_or(player_row["Shot Trend"], None),
                     ))
                 simulation_signature = hashlib.sha256(
-                    repr((selected_date, sorted(active_game_ids), simulation_records)).encode("utf-8")
+                    repr((selected_date, sorted(active_game_ids), simulations, simulation_records)).encode("utf-8")
                 ).hexdigest()
-                if st.button("Run 10,000 simulations", key="nhl_run_monte_carlo"):
+                if st.button(f"Run {simulations:,} simulations", key="nhl_run_monte_carlo"):
                     with st.spinner("Simulating the NHL slate..."):
                         st.session_state["nhl_sim_results"] = run_goal_monte_carlo(
-                            tuple(simulation_records), selected_date, 10000
+                            tuple(simulation_records), selected_date, simulations
                         )
                         st.session_state["nhl_sim_signature"] = simulation_signature
                 sim_results = st.session_state.get("nhl_sim_results")
