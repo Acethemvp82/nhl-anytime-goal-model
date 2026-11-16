@@ -26,7 +26,7 @@ st.caption("Goal Threat • Goal Match • Goalie Match • Final Anytime")
 
 def style_board_navy(value):
     """First Basket navy background for non-score cells; keep score colors intact."""
-    return "background-color: #172236; color: #eef4fa; font-weight: 500"
+    return "background-color: #0b1120; color: #eef4fa; font-weight: 500"
 
 
 def style_board_score(value):
@@ -1137,13 +1137,7 @@ if games:
                 )
                 st.dataframe(
                     board_display.style
-                    .map(style_board_navy, subset=[
-                        column for column in board_display.columns
-                        if column not in (
-                            "Goal Threat", "Goal Match", "Final Anytime",
-                            "Goalie Match", "Bet Tier",
-                        )
-                    ])
+                    .map(style_board_navy)
                     .map(style_board_score, subset=[
                         "Goal Threat", "Goal Match", "Final Anytime", "Goalie Match",
                     ])
