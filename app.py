@@ -940,7 +940,7 @@ if games:
                 skaters_df[col] = skaters_df[col].round(1)
         main_columns = [
             "Overall Rank", "Game Time", "Team Rank", "Player", "Team", "Hammer",
-            "Goal Match", "Goal Threat", "Final Anytime", "Goalie Match",
+            "Goal Threat", "Goal Match", "Final Anytime", "Goalie Match",
             "Bet Tier", "L5 S/GP", "Shot Trend", "Lineup Status",
         ]
         # Research-only opponent form: never enters Goal Match or ranking calculations.
@@ -1305,7 +1305,7 @@ if games:
             ).fillna(False).map({True: "💎", False: ""})
             display_columns = [
                 "Overall Rank", "Team Rank", "Player", "Team", "Actual Goals",
-                "Hammer", "Longshot", "Goal Match", "Goal Threat",
+                "Hammer", "Longshot", "Goal Threat", "Goal Match",
                 "Final Anytime", "Goalie Match", "Bet Tier",
                 "L5 S/GP", "Shot Trend", "Lineup Status", "Model Match",
             ]
