@@ -1020,11 +1020,17 @@ if games:
                     "Overall Rank", "Player", "Team", "Goal Threat",
                     "Goal Match", "Final Anytime", "Bet Tier",
                     "Lineup Check", "Goalie Check", "Sample Check",
-                ]].style.format({
-                    "Goal Threat": "{:.1f}",
-                    "Goal Match": "{:.1f}",
-                    "Final Anytime": "{:.1f}",
-                }),
+                ]].style
+                .map(style_board_navy)
+                .map(style_board_score, subset=[
+                    "Goal Threat", "Goal Match", "Final Anytime",
+                ])
+                .format({
+                    "Overall Rank": "{:.0f}",
+                    "Goal Threat": "{:.0f}",
+                    "Goal Match": "{:.0f}",
+                    "Final Anytime": "{:.0f}",
+                }, na_rep="—"),
                 use_container_width=True,
                 hide_index=True,
             )
