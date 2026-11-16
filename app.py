@@ -1352,7 +1352,19 @@ if games:
             st.dataframe(
                 goal_scorer_display(live_tracker.sort_values(
                     ["Actual Goals", "Overall Rank"], ascending=[False, True]
-                )), use_container_width=True, hide_index=True
+                ))
+                .style.map(style_board_navy)
+                .map(style_board_score, subset=[
+                    "Goal Match", "Goal Threat", "Final Anytime", "Goalie Match",
+                ])
+                .format({
+                    "Overall Rank": "{:.0f}", "Team Rank": "{:.0f}",
+                    "Actual Goals": "{:.0f}",
+                    "Goal Match": "{:.0f}", "Goal Threat": "{:.0f}",
+                    "Final Anytime": "{:.0f}", "Goalie Match": "{:.0f}",
+                    "L5 S/GP": "{:.1f}", "Shot Trend": "{:+.1f}",
+                }, na_rep="—"),
+                use_container_width=True, hide_index=True
             )
             st.caption("Live results update with GameCenter's 5-minute cache. Scores and rankings may change during games.")
         else:
