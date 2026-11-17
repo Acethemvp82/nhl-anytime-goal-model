@@ -453,6 +453,13 @@ if games:
     index=default_index
         )
 
+    if st.button(
+        "Refresh lineups",
+        help="Fetch fresh GameCenter boxscores and rebuild the board's lineup status.",
+        key="nhl_refresh_lineups",
+    ):
+        get_game_data.clear()
+
     daily_schedule = schedule_df[
             schedule_df["Date"] == selected_date
         ].copy()
@@ -611,11 +618,6 @@ if games:
                 roster_ids.add(pid)
         # When GameCenter has no dressed lineup, show the roster but flag it
         # as unconfirmed; never silently discard potential starters.
-        if not dressed_ids:
-            st.caption(
-                f"{team}: dressed lineup not yet published; roster candidates "
-                "are shown as unconfirmed."
-            )
         if not roster_players and team in roster_failures:
             st.error(roster_failures[team] + "; rankings incomplete. Retry after NHL API recovers.")
         if not roster_players:
@@ -835,6 +837,13 @@ if games:
         missing = coverage.loc[coverage["Skaters"] == 0, "Team"].tolist()
         if missing:
             st.error("Scheduled teams missing from rankings: " + ", ".join(missing))
+        pending_lineups = int(coverage["Lineup Status"].eq("Roster Candidate").sum())
+        if pending_lineups:
+            st.caption(
+                f"Awaiting GameCenter dressed-skater lists for {pending_lineups} teams. "
+                "Roster candidates are included. Use Refresh lineups to check again; "
+                "team details are in the lineup audit."
+            )
         with st.expander("🔎 Slate Coverage / Lineup Audit", expanded=bool(missing)):
             st.caption("Roster Candidate means the full roster is shown until GameCenter provides dressed skaters. Dressed (GameCenter) means the game feed identifies the skaters; it is not an independently verified lineup announcement.")
             st.dataframe(coverage, hide_index=True, use_container_width=True)
