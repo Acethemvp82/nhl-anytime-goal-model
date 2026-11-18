@@ -974,19 +974,40 @@ if games:
             "Goal Threat", "Goal Match", "Goalie Match", "Final Anytime",
             "Bet Tier", "Opp Goalie", "Lineup Status",
         ]
+        def refresh_board_game_states():
+            finished = {"OFF", "FINAL", "FINAL_OT", "FINAL_SO"}
+            state_key = f"nhl_game_states_{selected_date}"
+            states = {
+                row["Game_ID"]: str(row["Status"]).upper()
+                for _, row in daily_schedule.iterrows()
+            }
+            for box in game_data_map.values():
+                game_id = box.get("id")
+                state = str(box.get("gameState") or "").upper()
+                if game_id in states and state and states[game_id] not in finished:
+                    states[game_id] = state
+            states.update(st.session_state.get(state_key, {}))
+            try:
+                schedule = get_nhl_schedule()
+                fresh = {
+                    game.get("id"): str(game.get("gameState") or "").upper()
+                    for week in schedule.get("gameWeek", [])
+                    for game in week.get("games", [])
+                    if game.get("id") in states and game.get("gameState")
+                }
+            except (requests.RequestException, ValueError, KeyError):
+                fresh = {}
+            for game_id, state in fresh.items():
+                if states.get(game_id) not in finished:
+                    states[game_id] = state
+            st.session_state[state_key] = states
+            return states, len(fresh) == len(states) and bool(states)
+
         @st.fragment(run_every="5m")
         def render_active_top_five():
             # The full slate and its frozen rankings remain unchanged.
             # Refresh game states so completed games roll off the shortlist.
-            try:
-                fresh_schedule = get_nhl_schedule()
-                latest_states = {
-                    game.get("id"): str(game.get("gameState", "")).upper()
-                    for week in fresh_schedule.get("gameWeek", [])
-                    for game in week.get("games", [])
-                }
-            except (requests.RequestException, ValueError, KeyError):
-                latest_states = {}
+            latest_states, status_refreshed = refresh_board_game_states()
             finished_states = {"OFF", "FINAL", "FINAL_OT", "FINAL_SO"}
             finished_teams = {
                 team for team, game_id in game_id_map.items()
@@ -1006,8 +1027,8 @@ if games:
                 st.caption(
                     f"Excluded {len(finished_teams) // 2} completed games from the shortlist."
                 )
-            if not latest_states:
-                st.warning("Live game status is unavailable; completed games may still appear.")
+            if not status_refreshed:
+                st.warning("Using last available game statuses. Newly finished games may remain until the feed recovers.")
             if shortlist.empty:
                 st.info("No remaining goal scorer candidates for today's slate.")
                 return
@@ -1047,21 +1068,15 @@ if games:
         @st.fragment(run_every="5m")
         def render_active_goal_board():
             # Refresh only the visible board. Full slate and snapshots remain untouched.
-            try:
-                fresh_schedule = get_nhl_schedule()
-                latest_states = {
-                    game.get("id"): str(game.get("gameState", "")).upper()
-                    for week in fresh_schedule.get("gameWeek", [])
-                    for game in week.get("games", [])
-                }
-            except (requests.RequestException, ValueError, KeyError):
-                latest_states = {}
+            latest_states, status_refreshed = refresh_board_game_states()
             finished_states = {"OFF", "FINAL", "FINAL_OT", "FINAL_SO"}
             finished_teams = {
                 team for team, game_id in game_id_map.items()
                 if latest_states.get(game_id, "").upper() in finished_states
             }
             st.subheader("Today's Goal Board")
+            if not status_refreshed:
+                st.caption("Using last available game statuses while the live feed is unavailable.")
             st.caption("Goal scorer rankings · Scores are model ratings, not goal probabilities · Use the table toolbar to expand; click a column heading to sort")
             filter_team, filter_search, filter_hammer = st.columns([2, 3, 2])
             with filter_team:
